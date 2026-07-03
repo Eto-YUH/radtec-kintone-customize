@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-7";
+  const UI_VERSION = "20260703-8";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -569,7 +569,7 @@
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
         }
         if (section.key === "paper" && field.code === "DOIpaper") {
-          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOI取得</button></div></label>';
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOIから情報を取得</button></div></label>';
         }
         if (field.type === "textarea") {
           return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea></label>';
