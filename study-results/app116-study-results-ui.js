@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-10";
+  const UI_VERSION = "20260703-11";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -316,6 +316,10 @@
 
   const normalizeDoi = function (value) {
     return String(value || "")
+      .replace(/[０-９．／：]/g, function (char) {
+        const map = { "．": ".", "／": "/", "：": ":" };
+        return map[char] || String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
+      })
       .trim()
       .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")
       .replace(/^doi:\s*/i, "")
@@ -398,7 +402,27 @@
     return /^10\.\d{4,9}\/\S+$/i.test(doi);
   };
 
-  const applyDoiMetadata = async function (row, rowIndex) {
+  const hasExistingPaperMetadata = function (row) {
+    return ["publishedYear", "文字列__1行__2", "coAuthor", "Title", "Journal"].some(function (code) {
+      return String(row[code] || "").trim() !== "";
+    });
+  };
+
+  const askOverwritePaperMetadata = function (row) {
+    if (!hasExistingPaperMetadata(row)) {
+      return true;
+    }
+    return window.confirm("すでに入力済みの論文情報があります。DOIから取得した情報で上書きしますか？");
+  };
+
+  const applyFetchedValue = function (row, code, value) {
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      row[code] = value;
+    }
+  };
+
+  const applyDoiMetadata = async function (row, rowIndex, options) {
+    options = options || {};
     const doi = normalizeDoi(row.DOIpaper);
     if (!doi) {
       setDoiMessage(rowIndex, "DOIを入力してから取得してください。");
@@ -419,7 +443,7 @@
     try {
       const message = await fetchDoiWork(doi);
       if (!message) {
-        state.notice = "DOIから論文情報を取得できませんでした。";
+        setDoiMessage(rowIndex, "DOIの登録情報が見つかりませんでした。DOIが正しいか確認してください。");
         return;
       }
       const title = Array.isArray(message.title) ? message.title[0] : "";
@@ -427,19 +451,20 @@
       const year = getCrossrefYear(message);
       const authors = getCrossrefAuthors(message);
 
+      if (!options.confirmed && !askOverwritePaperMetadata(row)) {
+        setDoiMessage(rowIndex, "DOIからの反映をキャンセルしました。");
+        row.DOIpaper = doi;
+        render();
+        return;
+      }
+
       row.DOIpaper = doi;
-      if (title) {
-        row.Title = title;
-      }
-      if (journal) {
-        row.Journal = journal;
-      }
-      if (year) {
-        row.publishedYear = year;
-      }
+      applyFetchedValue(row, "Title", title);
+      applyFetchedValue(row, "Journal", journal);
+      applyFetchedValue(row, "publishedYear", year);
       if (authors.length > 0) {
-        row["文字列__1行__2"] = authors[0];
-        row.coAuthor = authors.join(", ");
+        applyFetchedValue(row, "文字列__1行__2", authors[0]);
+        applyFetchedValue(row, "coAuthor", authors.join(", "));
       }
 
       const paperSection = SECTIONS.find(function (section) {
@@ -449,8 +474,8 @@
       clearDoiMessage(rowIndex);
       state.notice = "DOIから論文情報を反映しました。";
     } catch (error) {
-      setDoiMessage(rowIndex, "論文情報を取得できませんでした。DOIを確認してください。");
-      state.notice = "DOIから論文情報を取得できませんでした: " + (error && error.message ? error.message : "原因不明");
+      setDoiMessage(rowIndex, "DOIの登録情報が見つかりませんでした。DOIが正しいか確認してください。");
+      state.notice = "Crossref/DataCiteでDOIを検索しましたが、論文情報を取得できませんでした。";
     }
   };
 
@@ -728,6 +753,10 @@
         row[fieldCode] = target.value;
         if (activeSection.key === "paper" && fieldCode === "DOIpaper") {
           clearDoiMessage(rowIndex);
+          const fieldError = target.closest("label") ? target.closest("label").querySelector(".radtec-ui-field-error") : null;
+          if (fieldError) {
+            fieldError.remove();
+          }
         }
         if (fieldCode === activeSection.roleCode) {
           syncPersonNameByRole(activeSection, row);
