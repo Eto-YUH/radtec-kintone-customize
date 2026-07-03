@@ -3,7 +3,7 @@
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
-  const UI_VERSION = "20260703-23";
+  const UI_VERSION = "20260703-24";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -626,8 +626,6 @@
           } else if (person && firstListedName) {
             if (!isSamePersonName(person, firstListedName)) {
               addValidationMessage(messages, seen, rowLabel + ": 著者名・発表者名と、一覧の先頭の名前が一致しているか確認してください。");
-            } else if (/^(共著者|共同著者|共同演者)$/.test(role)) {
-              addValidationMessage(messages, seen, rowLabel + ": 著者区分が共著・共同演者ですが、一覧の先頭と著者名・発表者名が同じです。著者区分が正しいか確認してください。");
             }
           }
         }
