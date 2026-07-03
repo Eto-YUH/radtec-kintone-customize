@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-8";
+  const UI_VERSION = "20260703-9";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -317,7 +317,8 @@
     return String(value || "")
       .trim()
       .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")
-      .replace(/^doi:\s*/i, "");
+      .replace(/^doi:\s*/i, "")
+      .replace(/[。、，,.\s]+$/g, "");
   };
 
   const getCrossrefYear = function (message) {
@@ -345,6 +346,45 @@
     return data && data.message ? data.message : null;
   };
 
+  const fetchDataciteWork = async function (doi) {
+    const response = await fetch("https://api.datacite.org/dois/" + encodeURIComponent(doi), {
+      headers: { Accept: "application/vnd.api+json" },
+    });
+    if (!response.ok) {
+      throw new Error("DataCite response: " + response.status);
+    }
+    const data = await response.json();
+    const attributes = data && data.data ? data.data.attributes || {} : {};
+    const title = attributes.titles && attributes.titles[0] ? attributes.titles[0].title : "";
+    const container = attributes.container || {};
+    const authors = (attributes.creators || []).map(function (creator) {
+      if (creator.name) {
+        return creator.name;
+      }
+      return [creator.familyName, creator.givenName].filter(Boolean).join(" ");
+    }).filter(Boolean);
+    return {
+      title: title ? [title] : [],
+      "container-title": container.title ? [container.title] : [],
+      author: authors.map(function (name) {
+        return { name: name };
+      }),
+      issued: attributes.publicationYear ? { "date-parts": [[attributes.publicationYear]] } : null,
+    };
+  };
+
+  const fetchDoiWork = async function (doi) {
+    try {
+      return await fetchCrossrefWork(doi);
+    } catch (crossrefError) {
+      try {
+        return await fetchDataciteWork(doi);
+      } catch (dataciteError) {
+        throw new Error((crossrefError && crossrefError.message ? crossrefError.message : "Crossref取得失敗") + " / " + (dataciteError && dataciteError.message ? dataciteError.message : "DataCite取得失敗"));
+      }
+    }
+  };
+
   const applyDoiMetadata = async function (row) {
     const doi = normalizeDoi(row.DOIpaper);
     if (!doi) {
@@ -356,7 +396,7 @@
     render();
 
     try {
-      const message = await fetchCrossrefWork(doi);
+      const message = await fetchDoiWork(doi);
       if (!message) {
         state.notice = "DOIから論文情報を取得できませんでした。";
         return;
