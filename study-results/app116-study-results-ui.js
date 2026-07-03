@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-13";
+  const UI_VERSION = "20260703-14";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -290,8 +290,13 @@
     const sourceName = sourceNameOverride || (state ? state.name || state.initialName : "");
     const role = section.roleCode ? String(row[section.roleCode] || "") : "";
     if (/^(共著者|共同著者|共同演者)$/.test(role)) {
+      if (section.key !== "paper") {
+        row[section.personCode] = "";
+      }
       if (!silent && state) {
-        state.notice = "著者区分を変更しました。著者名・発表者名は保持しています。";
+        state.notice = section.key === "paper"
+          ? "著者区分を変更しました。論文の著者名は保持しています。"
+          : "共著・共同演者を選択したため、氏名欄をクリアしました。";
       }
       return;
     }
@@ -474,7 +479,7 @@
       });
       state.counts.paper = paperSection ? countFilledRows(paperSection, state.sections.paper) : state.counts.paper;
       clearDoiMessage(rowIndex);
-      state.notice = "DOIから論文情報を反映しました。";
+      state.notice = "DOIから論文情報を反映しました。著者区分は筆頭著者・共著者のどちらか確認してください。";
     } catch (error) {
       setDoiMessage(rowIndex, "DOIの登録情報が見つかりませんでした。DOIが正しいか確認してください。");
       state.notice = "Crossref/DataCiteでDOIを検索しましたが、論文情報を取得できませんでした。";
