@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-16";
+  const UI_VERSION = "20260703-17";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -564,8 +564,34 @@
     });
   };
 
+  const addValidationMessage = function (messages, seen, message) {
+    if (!seen[message]) {
+      messages.push(message);
+      seen[message] = true;
+    }
+  };
+
+  const shouldSkipOptionalBlankCheck = function (section, field, yearCode, titleCode, contributorListCode) {
+    return field.code === section.roleCode
+      || field.code === section.personCode
+      || field.code === yearCode
+      || field.code === titleCode
+      || field.code === contributorListCode
+      || field.code === "DOIpaper";
+  };
+
+  const getYearChoices = function (value) {
+    const numeric = Number(value);
+    const base = Number.isFinite(numeric) && numeric >= 1900 ? numeric : new Date().getFullYear();
+    const start = base - 4;
+    return Array.from({ length: 9 }, function (_, index) {
+      return String(start + index);
+    });
+  };
+
   const validateState = function () {
     const messages = [];
+    const seen = {};
     SECTIONS.forEach(function (section) {
       const rows = state.sections[section.key] || [];
       const yearCode = getYearCode(section);
@@ -582,31 +608,40 @@
         const role = section.roleCode ? getValue(row, section.roleCode) : "";
 
         if (!year) {
-          messages.push(rowLabel + ": 年が未入力です。");
+          addValidationMessage(messages, seen, rowLabel + ": 年が未入力です。");
         } else if (!/^\d{4}$/.test(year)) {
-          messages.push(rowLabel + ": 年は2026のような4桁で入力してください。");
+          addValidationMessage(messages, seen, rowLabel + ": 年は2026のような4桁で入力してください。");
         }
         if (titleCode && !title) {
-          messages.push(rowLabel + ": タイトル・名称が未入力です。");
+          addValidationMessage(messages, seen, rowLabel + ": タイトル・名称が未入力です。");
         }
         if (section.personCode && /^筆頭/.test(role) && !person) {
-          messages.push(rowLabel + ": 筆頭なのに著者名・発表者名が空です。");
+          addValidationMessage(messages, seen, rowLabel + ": 筆頭なのに著者名・発表者名が空です。");
         }
         if (contributorListCode && CONTRIBUTOR_CHECK_SECTION_KEYS.indexOf(section.key) !== -1) {
           const contributorList = getValue(row, contributorListCode);
           const firstListedName = getFirstListedName(contributorList);
           if (!contributorList) {
-            messages.push(rowLabel + ": " + (section.key === "paper" ? "筆頭著者＋共著者" : "発表者・共同者一覧") + "が未入力です。");
-          } else if (person && firstListedName && !isSamePersonName(person, firstListedName)) {
-            messages.push(rowLabel + ": 著者名・発表者名と、一覧の先頭の名前が一致しているか確認してください。");
+            addValidationMessage(messages, seen, rowLabel + ": " + (section.key === "paper" ? "筆頭著者＋共著者" : "発表者・共同者一覧") + "が未入力です。");
+          } else if (person && firstListedName) {
+            if (!isSamePersonName(person, firstListedName)) {
+              addValidationMessage(messages, seen, rowLabel + ": 著者名・発表者名と、一覧の先頭の名前が一致しているか確認してください。");
+            } else if (/^(共著者|共同著者|共同演者)$/.test(role)) {
+              addValidationMessage(messages, seen, rowLabel + ": 著者区分が共著・共同演者ですが、一覧の先頭と著者名・発表者名が同じです。著者区分が正しいか確認してください。");
+            }
           }
         }
         if (section.key === "paper") {
           const doi = normalizeDoi(getValue(row, "DOIpaper"));
           if (doi && !isCompleteDoi(doi)) {
-            messages.push(rowLabel + ": DOIは 10.xxxx/... または https://doi.org/10.xxxx/... の形にしてください。");
+            addValidationMessage(messages, seen, rowLabel + ": DOIは 10.xxxx/... または https://doi.org/10.xxxx/... の形にしてください。");
           }
         }
+        section.fields.forEach(function (field) {
+          if (!shouldSkipOptionalBlankCheck(section, field, yearCode, titleCode, contributorListCode) && !getValue(row, field.code)) {
+            addValidationMessage(messages, seen, rowLabel + ": " + field.label + " は任意ですが未入力です。");
+          }
+        });
       });
     });
     return messages;
@@ -665,7 +700,6 @@
       '<label>氏名 <small>name</small><input data-name-field value="' + escapeAttr(state.name) + '"></label>',
       '</div>',
       state.notice ? '<div class="radtec-ui-notice">' + escapeHtml(state.notice) + '</div>' : '',
-      renderValidationMessages(),
       '<div class="radtec-ui-tabs">',
       SECTIONS.map(function (section) {
         return '<button type="button" class="' + (section.key === state.active ? "is-active" : "") + '" data-tab="' + section.key + '"><span>' + escapeHtml(section.label) + '</span> <small>' + state.counts[section.key] + '件</small></button>';
@@ -676,6 +710,7 @@
         return renderRow(activeSection, row, rowIndex);
       }).join(""),
       '</div>',
+      renderValidationMessages(),
       '<div class="radtec-ui-floating-toolbar">',
       '<button type="button" data-action="add-row">行を追加</button>',
       '<button type="button" data-action="validate">保存前チェック</button>',
@@ -701,6 +736,11 @@
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><select ' + base + '>' + field.options.map(function (option) {
             return '<option value="' + escapeAttr(option) + '"' + (option === value ? " selected" : "") + '>' + escapeHtml(option) + '</option>';
           }).join("") + '</select></label>';
+        }
+        if (field.type === "number" && /年/.test(field.label)) {
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><input type="text" inputmode="numeric" value="' + escapeAttr(value) + '" ' + base + '><div class="radtec-ui-year-grid">' + getYearChoices(value).map(function (year) {
+            return '<button type="button" class="' + (String(value) === year ? "is-active" : "") + '" data-action="set-year" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '" data-year="' + year + '">' + year + '</button>';
+          }).join("") + '</div></label>';
         }
         if (field.code === section.personCode) {
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
@@ -753,15 +793,6 @@
       return event;
     }
     normalizeBeforeSave();
-    const validationMessages = validateState();
-    if (validationMessages.length > 0) {
-      state.validationMessages = validationMessages;
-      state.notice = "保存前チェックで確認が必要な項目があります。";
-      event.error = validationMessages.join("\n");
-      render();
-      return event;
-    }
-    state.validationMessages = [];
     if (event.record.name) {
       event.record.name.value = state.name;
     }
@@ -858,6 +889,18 @@
         }
         state.counts[activeSection.key] = countFilledRows(activeSection, state.sections[activeSection.key]);
         render();
+        return;
+      }
+      if (target.dataset.action === "set-year") {
+        const activeSection = getActiveSection();
+        const rowIndex = Number(target.dataset.row);
+        const fieldCode = target.dataset.field;
+        if (!Number.isNaN(rowIndex) && fieldCode && state.sections[activeSection.key][rowIndex]) {
+          state.sections[activeSection.key][rowIndex][fieldCode] = target.dataset.year || "";
+          state.counts[activeSection.key] = countFilledRows(activeSection, state.sections[activeSection.key]);
+          state.validationMessages = [];
+          render();
+        }
         return;
       }
       if (target.dataset.action === "fetch-doi") {
@@ -1001,6 +1044,9 @@
       ".radtec-ui-grid label{display:grid;gap:4px;font-weight:700;}",
       ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
       ".radtec-ui-inline-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;}",
+      ".radtec-ui-year-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:4px;}",
+      ".radtec-ui-year-grid button{padding:4px 6px;font-size:12px;font-weight:700;}",
+      ".radtec-ui-year-grid button.is-active{background:#256fa8 !important;border-color:#256fa8 !important;color:#fff !important;}",
       ".radtec-ui-field-error{margin-top:4px;color:#66520b;background:#fff9df;border:1px solid #ead898;border-radius:6px;padding:6px 8px;font-size:12px;font-weight:700;}",
       ".radtec-ui-field-help{margin-top:4px;color:#607284;font-size:12px;font-weight:500;}",
       ".radtec-ui-note{margin-top:10px;}",
