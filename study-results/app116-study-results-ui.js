@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-12";
+  const UI_VERSION = "20260703-13";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -290,10 +290,12 @@
     const sourceName = sourceNameOverride || (state ? state.name || state.initialName : "");
     const role = section.roleCode ? String(row[section.roleCode] || "") : "";
     if (/^(共著者|共同著者|共同演者)$/.test(role)) {
-      row[section.personCode] = "";
       if (!silent && state) {
-        state.notice = "共著・共同演者を選択したため、氏名欄をクリアしました。";
+        state.notice = "著者区分を変更しました。著者名・発表者名は保持しています。";
       }
+      return;
+    }
+    if (String(row[section.personCode] || "").trim() !== "") {
       return;
     }
     if (!sourceName) {
