@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-15";
+  const UI_VERSION = "20260703-16";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -141,6 +141,7 @@
       ],
     },
   ];
+  const CONTRIBUTOR_CHECK_SECTION_KEYS = ["paper", "domestic", "international", "seminar"];
 
   let state = null;
   let staffNameMap = null;
@@ -529,12 +530,47 @@
     return titleField ? titleField.code : "";
   };
 
+  const getContributorListCode = function (section) {
+    const field = section.fields.find(function (item) {
+      return /＋/.test(item.label) && item.type === "textarea";
+    });
+    return field ? field.code : "";
+  };
+
+  const getFirstListedName = function (value) {
+    return String(value || "")
+      .split(/[、，,;\n\r]+/)
+      .map(function (item) {
+        return item.trim();
+      })
+      .filter(Boolean)[0] || "";
+  };
+
+  const normalizeComparableName = function (value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[.,，、・\s\u3000]/g, "");
+  };
+
+  const isSamePersonName = function (person, firstListedName) {
+    const targets = [
+      person,
+      compactJapaneseName(person),
+      toEnglishName(person),
+    ].map(normalizeComparableName).filter(Boolean);
+    const first = normalizeComparableName(firstListedName);
+    return first && targets.some(function (target) {
+      return target === first;
+    });
+  };
+
   const validateState = function () {
     const messages = [];
     SECTIONS.forEach(function (section) {
       const rows = state.sections[section.key] || [];
       const yearCode = getYearCode(section);
       const titleCode = getTitleCode(section);
+      const contributorListCode = getContributorListCode(section);
       rows.forEach(function (row, index) {
         if (!hasSubstantiveValue(section, row)) {
           return;
@@ -556,12 +592,18 @@
         if (section.personCode && /^筆頭/.test(role) && !person) {
           messages.push(rowLabel + ": 筆頭なのに著者名・発表者名が空です。");
         }
-        if (section.personCode && /^(共著者|共同著者|共同演者)$/.test(role) && person) {
-          messages.push(rowLabel + ": 共著・共同演者ですが、著者名・発表者名が残っています。不要なら空にしてください。");
+        if (contributorListCode && CONTRIBUTOR_CHECK_SECTION_KEYS.indexOf(section.key) !== -1) {
+          const contributorList = getValue(row, contributorListCode);
+          const firstListedName = getFirstListedName(contributorList);
+          if (!contributorList) {
+            messages.push(rowLabel + ": " + (section.key === "paper" ? "筆頭著者＋共著者" : "発表者・共同者一覧") + "が未入力です。");
+          } else if (person && firstListedName && !isSamePersonName(person, firstListedName)) {
+            messages.push(rowLabel + ": 著者名・発表者名と、一覧の先頭の名前が一致しているか確認してください。");
+          }
         }
         if (section.key === "paper") {
-          const doi = getValue(row, "DOIpaper");
-          if (doi && !/^(10\.\S+|https:\/\/doi\.org\/10\.\S+)$/i.test(doi)) {
+          const doi = normalizeDoi(getValue(row, "DOIpaper"));
+          if (doi && !isCompleteDoi(doi)) {
             messages.push(rowLabel + ": DOIは 10.xxxx/... または https://doi.org/10.xxxx/... の形にしてください。");
           }
         }
@@ -636,7 +678,6 @@
       '</div>',
       '<div class="radtec-ui-floating-toolbar">',
       '<button type="button" data-action="add-row">行を追加</button>',
-      '<button type="button" data-action="format-names">名前整形</button>',
       '<button type="button" data-action="validate">保存前チェック</button>',
       '</div>',
       '<div class="radtec-ui-note">この試作版は「追加・編集画面」で入力し、kintone標準の保存ボタンを押すと既存サブテーブルへ書き戻します。HP公開は現在の生成ルール側で制御し、この画面では公開チェックを保存しません。</div>',
@@ -669,7 +710,10 @@
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOIから情報を取得</button></div>' + (doiMessage ? '<div class="radtec-ui-field-error">' + escapeHtml(doiMessage) + '</div>' : '') + '</label>';
         }
         if (field.type === "textarea") {
-          return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea></label>';
+          const helper = /＋/.test(field.label)
+            ? '<div class="radtec-ui-field-help">日本語名は「、」、英語名は「, 」で区切ってください。先頭には筆頭著者・発表者を入力します。</div>'
+            : "";
+          return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea>' + helper + '</label>';
         }
         return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '></label>';
       }).join(""),
@@ -865,11 +909,6 @@
         render();
         return;
       }
-      if (target.dataset.action === "format-names") {
-        formatNames();
-        state.validationMessages = [];
-        render();
-      }
     });
   };
 
@@ -963,6 +1002,7 @@
       ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
       ".radtec-ui-inline-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;}",
       ".radtec-ui-field-error{margin-top:4px;color:#66520b;background:#fff9df;border:1px solid #ead898;border-radius:6px;padding:6px 8px;font-size:12px;font-weight:700;}",
+      ".radtec-ui-field-help{margin-top:4px;color:#607284;font-size:12px;font-weight:500;}",
       ".radtec-ui-note{margin-top:10px;}",
       "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
     ].join("");
