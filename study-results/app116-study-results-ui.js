@@ -551,7 +551,10 @@
       '<div class="radtec-ui-row">',
       '<div class="radtec-ui-row-head">',
       '<strong>' + escapeHtml(section.label) + ' ' + (rowIndex + 1) + '</strong>',
+      '<div class="radtec-ui-row-actions">',
+      section.key === "paper" ? '<button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOI取得</button>' : "",
       '<button type="button" data-action="remove-row" data-row="' + rowIndex + '">削除</button>',
+      '</div>',
       '</div>',
       '<div class="radtec-ui-grid">',
       section.fields.map(function (field) {
@@ -564,9 +567,6 @@
         }
         if (field.code === section.personCode) {
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
-        }
-        if (section.key === "paper" && field.code === "DOIpaper") {
-          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOI取得</button></div></label>';
         }
         if (field.type === "textarea") {
           return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea></label>';
@@ -838,6 +838,7 @@
       ".radtec-ui-tabs button.is-active span{color:#fff !important;}",
       ".radtec-ui-tabs button.is-active small{color:#e8f4ff !important;}",
       ".radtec-ui-row{border:1px solid #d8e5ee;border-radius:8px;background:#fff;margin-top:10px;padding:12px;}",
+      ".radtec-ui-row-actions{display:flex;gap:6px;align-items:center;}",
       ".radtec-ui-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;}",
       ".radtec-ui-grid label{display:grid;gap:4px;font-weight:700;}",
       ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
