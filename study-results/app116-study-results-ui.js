@@ -3,7 +3,7 @@
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
-  const UI_VERSION = "20260703-22";
+  const UI_VERSION = "20260703-23";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -317,6 +317,18 @@
     const text = String(value || "").trim();
     const map = staffNameMap || STAFF_NAME_MAP;
     return map[normalizeNameKey(text)] || text;
+  };
+
+  const getJapaneseNameForRow = function (row, fieldCode) {
+    return row.__japaneseNameByField && row.__japaneseNameByField[fieldCode]
+      ? row.__japaneseNameByField[fieldCode]
+      : compactJapaneseName(state ? state.name || state.initialName : "");
+  };
+
+  const shouldShowJapaneseConvert = function (row, fieldCode) {
+    const currentValue = String(row[fieldCode] || "").trim();
+    const japaneseName = getJapaneseNameForRow(row, fieldCode);
+    return currentValue && japaneseName && currentValue === toEnglishName(japaneseName);
   };
 
   const normalizeDoi = function (value) {
@@ -655,14 +667,30 @@
     const paperSection = SECTIONS.find(function (section) {
       return section.key === "paper";
     });
-    if (!paperSection) {
-      return;
+    if (paperSection) {
+      (state.sections.paper || []).forEach(function (row) {
+        const doi = getValue(row, "DOIpaper");
+        if (/^https:\/\/doi\.org\/10\./i.test(doi)) {
+          row.DOIpaper = normalizeDoi(doi);
+        }
+      });
     }
-    (state.sections.paper || []).forEach(function (row) {
-      const doi = getValue(row, "DOIpaper");
-      if (/^https:\/\/doi\.org\/10\./i.test(doi)) {
-        row.DOIpaper = normalizeDoi(doi);
+    ["domestic", "international", "seminar"].forEach(function (sectionKey) {
+      const section = SECTIONS.find(function (item) {
+        return item.key === sectionKey;
+      });
+      if (!section) {
+        return;
       }
+      const contributorListCode = getContributorListCode(section);
+      if (!contributorListCode || !section.personCode) {
+        return;
+      }
+      (state.sections[section.key] || []).forEach(function (row) {
+        if (!getValue(row, contributorListCode) && getValue(row, section.personCode)) {
+          row[contributorListCode] = getValue(row, section.personCode);
+        }
+      });
     });
   };
 
@@ -729,16 +757,15 @@
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><input type="text" inputmode="numeric" value="' + escapeAttr(value) + '" ' + base + '></label>';
         }
         if (field.code === section.personCode) {
-          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
+          const convertLabel = shouldShowJapaneseConvert(row, field.code) ? "日本語変換" : "英語変換";
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">' + convertLabel + '</button></div></label>';
         }
         if (section.key === "paper" && field.code === "DOIpaper") {
           const doiMessage = state.doiMessages[String(rowIndex)] || "";
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOIから情報を取得</button></div>' + (doiMessage ? '<div class="radtec-ui-field-error">' + escapeHtml(doiMessage) + '</div>' : '') + '</label>';
         }
         if (field.type === "textarea") {
-          const helper = /＋/.test(field.label)
-            ? '<div class="radtec-ui-field-help">日本語名は「、」、英語名は「, 」で区切ってください。先頭には筆頭著者・発表者を入力します。</div>'
-            : "";
+          const helper = getTextareaHelper(section, field);
           return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea>' + helper + '</label>';
         }
         return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '></label>';
@@ -746,6 +773,16 @@
       '</div>',
       '</div>',
     ].join("");
+  };
+
+  const getTextareaHelper = function (section, field) {
+    if (!/＋/.test(field.label)) {
+      return "";
+    }
+    if (["domestic", "international", "seminar"].indexOf(section.key) !== -1) {
+      return '<div class="radtec-ui-field-help">一人での発表なら入力不要です。空欄のまま保存すると、発表者名を自動で入れます。複数名の場合は日本語名は「、」、英語名は「, 」で区切ってください。</div>';
+    }
+    return '<div class="radtec-ui-field-help">日本語名は「、」、英語名は「, 」で区切ってください。先頭には筆頭著者・発表者を入力します。</div>';
   };
 
   const getViewerIssues = function (section, row) {
@@ -1055,12 +1092,22 @@
         const rowIndex = Number(target.dataset.row);
         const fieldCode = target.dataset.field;
         if (!Number.isNaN(rowIndex) && fieldCode) {
-          const currentValue = state.sections[activeSection.key][rowIndex][fieldCode] || state.initialName;
-          const convertedName = toEnglishName(currentValue);
-          if (convertedName === currentValue) {
+          const row = state.sections[activeSection.key][rowIndex];
+          const currentValue = String(row[fieldCode] || "").trim();
+          if (shouldShowJapaneseConvert(row, fieldCode)) {
+            row[fieldCode] = getJapaneseNameForRow(row, fieldCode);
+            state.notice = "日本語氏名へ戻しました。";
+            render();
+            return;
+          }
+          const sourceName = currentValue || state.initialName;
+          const convertedName = toEnglishName(sourceName);
+          if (!sourceName || convertedName === sourceName) {
             state.notice = "英語氏名の対応が見つかりませんでした。職員名簿の英語氏名フィールド連携が必要です。";
           } else {
-            state.sections[activeSection.key][rowIndex][fieldCode] = convertedName;
+            row.__japaneseNameByField = row.__japaneseNameByField || {};
+            row.__japaneseNameByField[fieldCode] = sourceName;
+            row[fieldCode] = convertedName;
             state.notice = "英語氏名へ変換しました。";
           }
           render();
