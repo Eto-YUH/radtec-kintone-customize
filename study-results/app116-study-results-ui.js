@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-9";
+  const UI_VERSION = "20260703-10";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -222,6 +222,7 @@
       name: readField(record, "name"),
       initialName: readField(record, "name"),
       notice: "",
+      doiMessages: {},
       validationMessages: [],
       active: "paper",
       counts: {},
@@ -385,13 +386,33 @@
     }
   };
 
-  const applyDoiMetadata = async function (row) {
+  const setDoiMessage = function (rowIndex, message) {
+    state.doiMessages[String(rowIndex)] = message;
+  };
+
+  const clearDoiMessage = function (rowIndex) {
+    delete state.doiMessages[String(rowIndex)];
+  };
+
+  const isCompleteDoi = function (doi) {
+    return /^10\.\d{4,9}\/\S+$/i.test(doi);
+  };
+
+  const applyDoiMetadata = async function (row, rowIndex) {
     const doi = normalizeDoi(row.DOIpaper);
     if (!doi) {
-      state.notice = "DOIを入力してから取得してください。";
+      setDoiMessage(rowIndex, "DOIを入力してから取得してください。");
+      render();
+      return;
+    }
+    if (!isCompleteDoi(doi)) {
+      setDoiMessage(rowIndex, "DOIが途中までのようです。10.xxxx/xxxxx の形で入力してください。");
+      row.DOIpaper = doi;
+      render();
       return;
     }
 
+    clearDoiMessage(rowIndex);
     state.notice = "DOIから論文情報を取得しています...";
     render();
 
@@ -425,8 +446,10 @@
         return section.key === "paper";
       });
       state.counts.paper = paperSection ? countFilledRows(paperSection, state.sections.paper) : state.counts.paper;
+      clearDoiMessage(rowIndex);
       state.notice = "DOIから論文情報を反映しました。";
     } catch (error) {
+      setDoiMessage(rowIndex, "論文情報を取得できませんでした。DOIを確認してください。");
       state.notice = "DOIから論文情報を取得できませんでした: " + (error && error.message ? error.message : "原因不明");
     }
   };
@@ -609,7 +632,8 @@
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
         }
         if (section.key === "paper" && field.code === "DOIpaper") {
-          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOIから情報を取得</button></div></label>';
+          const doiMessage = state.doiMessages[String(rowIndex)] || "";
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOIから情報を取得</button></div>' + (doiMessage ? '<div class="radtec-ui-field-error">' + escapeHtml(doiMessage) + '</div>' : '') + '</label>';
         }
         if (field.type === "textarea") {
           return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea></label>';
@@ -702,6 +726,9 @@
         const activeSection = getActiveSection();
         const row = state.sections[activeSection.key][rowIndex];
         row[fieldCode] = target.value;
+        if (activeSection.key === "paper" && fieldCode === "DOIpaper") {
+          clearDoiMessage(rowIndex);
+        }
         if (fieldCode === activeSection.roleCode) {
           syncPersonNameByRole(activeSection, row);
           render();
@@ -765,7 +792,7 @@
           if (inlineInput) {
             row.DOIpaper = inlineInput.value;
           }
-          await applyDoiMetadata(row);
+          await applyDoiMetadata(row, rowIndex);
           state.validationMessages = [];
           render();
         } else {
@@ -897,6 +924,7 @@
       ".radtec-ui-grid label{display:grid;gap:4px;font-weight:700;}",
       ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
       ".radtec-ui-inline-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;}",
+      ".radtec-ui-field-error{margin-top:4px;color:#a33b2f;font-size:12px;font-weight:700;}",
       ".radtec-ui-note{margin-top:10px;}",
       "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
     ].join("");
