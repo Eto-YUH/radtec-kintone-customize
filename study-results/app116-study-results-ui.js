@@ -2,11 +2,15 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-21";
+  const VIEW_ROOT_ID = "radtec-study-results-viewer";
+  const UI_VERSION = "20260703-22";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
     "app.record.edit.show",
+  ];
+  const EVENTS_DETAIL = [
+    "app.record.detail.show",
   ];
   const EVENTS_SUBMIT = [
     "app.record.create.submit",
@@ -142,6 +146,7 @@
     },
   ];
   const CONTRIBUTOR_CHECK_SECTION_KEYS = ["paper", "domestic", "international", "seminar"];
+  const HP_PUBLIC_SECTION_KEYS = ["paper", "domestic", "international", "seminar"];
 
   let state = null;
   let staffNameMap = null;
@@ -743,6 +748,158 @@
     ].join("");
   };
 
+  const getViewerIssues = function (section, row) {
+    const issues = [];
+    const yearCode = getYearCode(section);
+    const titleCode = getTitleCode(section);
+    const contributorListCode = getContributorListCode(section);
+    if (yearCode && !getValue(row, yearCode)) {
+      issues.push("年未入力");
+    }
+    if (titleCode && !getValue(row, titleCode)) {
+      issues.push("タイトル未入力");
+    }
+    if (contributorListCode && HP_PUBLIC_SECTION_KEYS.indexOf(section.key) !== -1 && !getValue(row, contributorListCode)) {
+      issues.push(section.key === "paper" ? "著者一覧未入力" : "演者一覧未入力");
+    }
+    if (section.key === "paper") {
+      const doi = normalizeDoi(getValue(row, "DOIpaper"));
+      if (doi && !isCompleteDoi(doi)) {
+        issues.push("DOI形式確認");
+      }
+    }
+    return issues;
+  };
+
+  const getViewerMetaFields = function (section, row) {
+    const yearCode = getYearCode(section);
+    const titleCode = getTitleCode(section);
+    return section.fields.filter(function (field) {
+      return field.code !== yearCode
+        && field.code !== titleCode
+        && field.code !== section.roleCode
+        && field.code !== section.personCode
+        && field.code !== "DOIpaper"
+        && getValue(row, field.code);
+    });
+  };
+
+  const renderViewerRow = function (section, row) {
+    const yearCode = getYearCode(section);
+    const titleCode = getTitleCode(section);
+    const year = getValue(row, yearCode) || "年未入力";
+    const title = getValue(row, titleCode) || "タイトル未入力";
+    const role = section.roleCode ? getValue(row, section.roleCode) : "";
+    const person = section.personCode ? getValue(row, section.personCode) : "";
+    const doi = section.key === "paper" ? normalizeDoi(getValue(row, "DOIpaper")) : "";
+    const issues = getViewerIssues(section, row);
+    const isHpPublic = HP_PUBLIC_SECTION_KEYS.indexOf(section.key) !== -1;
+    const titleHtml = doi && isCompleteDoi(doi)
+      ? '<a href="https://doi.org/' + escapeAttr(doi) + '" target="_blank" rel="noopener">' + escapeHtml(title) + '</a>'
+      : escapeHtml(title);
+    const metaFields = getViewerMetaFields(section, row);
+
+    return [
+      '<article class="radtec-view-card' + (issues.length ? " has-issues" : "") + '">',
+      '<div class="radtec-view-card-main">',
+      '<div class="radtec-view-year">' + escapeHtml(year) + '</div>',
+      '<div class="radtec-view-body">',
+      '<div class="radtec-view-title">' + titleHtml + '</div>',
+      '<div class="radtec-view-person">',
+      [role, person].filter(Boolean).map(escapeHtml).join(" / "),
+      '</div>',
+      metaFields.length ? '<dl class="radtec-view-meta">' + metaFields.map(function (field) {
+        return '<div><dt>' + escapeHtml(field.label) + '</dt><dd>' + escapeHtml(getValue(row, field.code)) + '</dd></div>';
+      }).join("") + '</dl>' : '',
+      '</div>',
+      '</div>',
+      '<div class="radtec-view-badges">',
+      isHpPublic ? '<span class="is-public">HP対象</span>' : '<span>面談用</span>',
+      issues.map(function (issue) {
+        return '<span class="is-issue">' + escapeHtml(issue) + '</span>';
+      }).join(""),
+      '</div>',
+      '</article>',
+    ].join("");
+  };
+
+  const renderViewerSection = function (section, rows) {
+    const filledRows = (rows || []).filter(function (row) {
+      return hasSubstantiveValue(section, row);
+    }).slice().sort(function (a, b) {
+      const yearA = Number(getValue(a, getYearCode(section))) || 0;
+      const yearB = Number(getValue(b, getYearCode(section))) || 0;
+      return yearB - yearA;
+    });
+    if (filledRows.length === 0) {
+      return "";
+    }
+    return [
+      '<section class="radtec-view-section">',
+      '<h3>' + escapeHtml(section.label) + '<span>' + filledRows.length + '件</span></h3>',
+      '<div class="radtec-view-list">',
+      filledRows.map(function (row) {
+        return renderViewerRow(section, row);
+      }).join(""),
+      '</div>',
+      '</section>',
+    ].join("");
+  };
+
+  const renderViewer = function (viewState) {
+    const root = document.getElementById(VIEW_ROOT_ID);
+    if (!root) {
+      return;
+    }
+    const total = SECTIONS.reduce(function (sum, section) {
+      return sum + countFilledRows(section, viewState.sections[section.key] || []);
+    }, 0);
+    const issueCount = SECTIONS.reduce(function (sum, section) {
+      return sum + (viewState.sections[section.key] || []).filter(function (row) {
+        return hasSubstantiveValue(section, row) && getViewerIssues(section, row).length > 0;
+      }).length;
+    }, 0);
+    const sectionsHtml = SECTIONS.map(function (section) {
+      return renderViewerSection(section, viewState.sections[section.key] || []);
+    }).join("");
+    root.innerHTML = [
+      '<div class="radtec-view-head">',
+      '<div><strong>研究業績 面談チェック</strong><span> v' + UI_VERSION + '</span></div>',
+      '<div class="radtec-view-summary">',
+      '<span>合計 ' + total + '件</span>',
+      '<span class="' + (issueCount ? "has-issues" : "") + '">要確認 ' + issueCount + '件</span>',
+      '</div>',
+      '</div>',
+      '<div class="radtec-view-person-name">' + escapeHtml(viewState.name || "氏名未入力") + '</div>',
+      sectionsHtml || '<div class="radtec-view-empty">登録済みの業績はありません。</div>',
+      '<div class="radtec-view-note">タイトル・年・著者一覧などに不足がある行は「要確認」として表示しています。HP反映時は、このような不完全データを除外する方針にできます。</div>',
+    ].join("");
+  };
+
+  const mountViewer = async function (event) {
+    const oldRoot = document.getElementById(VIEW_ROOT_ID);
+    if (oldRoot) {
+      oldRoot.remove();
+    }
+
+    await loadStaffNameMap();
+    const viewState = buildState(event.record || {});
+    const root = document.createElement("div");
+    root.id = VIEW_ROOT_ID;
+
+    const header = kintone.app.record.getHeaderMenuSpaceElement
+      ? kintone.app.record.getHeaderMenuSpaceElement()
+      : null;
+    if (header) {
+      header.appendChild(root);
+    } else {
+      document.body.insertBefore(root, document.body.firstChild);
+    }
+
+    injectStyle();
+    renderViewer(viewState);
+  };
+
   const mount = async function (event) {
     const oldRoot = document.getElementById(ROOT_ID);
     if (oldRoot) {
@@ -1014,7 +1171,35 @@
       ".radtec-ui-field-error{margin-top:4px;color:#66520b;background:#fff9df;border:1px solid #ead898;border-radius:6px;padding:6px 8px;font-size:12px;font-weight:700;}",
       ".radtec-ui-field-help{margin-top:4px;color:#607284;font-size:12px;font-weight:500;}",
       ".radtec-ui-note{margin-top:10px;}",
+      "#" + VIEW_ROOT_ID + "{margin:12px 0;padding:14px;border:1px solid #c8d6df;border-radius:8px;background:#fbfcfd;color:#24384a;font-size:14px;line-height:1.55;}",
+      ".radtec-view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;}",
+      ".radtec-view-head strong{font-size:16px;}",
+      ".radtec-view-head span,.radtec-view-note{color:#607284;font-size:12px;font-weight:500;}",
+      ".radtec-view-person-name{font-size:18px;font-weight:800;margin:8px 0 12px;}",
+      ".radtec-view-summary{display:flex;gap:8px;flex-wrap:wrap;}",
+      ".radtec-view-summary span,.radtec-view-badges span{display:inline-flex;align-items:center;border:1px solid #d4e0e8;border-radius:999px;background:#fff;padding:3px 8px;font-size:12px;font-weight:700;color:#425466;}",
+      ".radtec-view-summary span.has-issues,.radtec-view-badges span.is-issue{border-color:#e7bd83;background:#fff7e8;color:#7a4b00;}",
+      ".radtec-view-badges span.is-public{border-color:#aed3c0;background:#eef9f2;color:#235b38;}",
+      ".radtec-view-section{margin-top:14px;}",
+      ".radtec-view-section h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:15px;}",
+      ".radtec-view-section h3 span{color:#607284;font-size:12px;font-weight:700;}",
+      ".radtec-view-list{display:grid;gap:8px;}",
+      ".radtec-view-card{border:1px solid #d9e3ea;border-radius:8px;background:#fff;padding:10px;}",
+      ".radtec-view-card.has-issues{border-color:#e7bd83;background:#fffdf8;}",
+      ".radtec-view-card-main{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;}",
+      ".radtec-view-year{font-weight:800;color:#256fa8;}",
+      ".radtec-view-title{font-weight:800;color:#20364a;overflow-wrap:anywhere;}",
+      ".radtec-view-title a{color:#1f6fa8;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;}",
+      ".radtec-view-person{margin-top:3px;color:#516475;font-size:13px;}",
+      ".radtec-view-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin:8px 0 0;}",
+      ".radtec-view-meta div{display:grid;grid-template-columns:82px minmax(0,1fr);gap:6px;}",
+      ".radtec-view-meta dt{color:#607284;font-size:12px;font-weight:700;}",
+      ".radtec-view-meta dd{margin:0;overflow-wrap:anywhere;}",
+      ".radtec-view-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}",
+      ".radtec-view-empty{padding:14px;border:1px dashed #cbd9e4;border-radius:8px;background:#fff;color:#607284;}",
+      ".radtec-view-note{margin-top:12px;}",
       "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
+      "@media(max-width:760px){.radtec-view-head{align-items:flex-start;flex-direction:column;}.radtec-view-card-main{grid-template-columns:1fr;}.radtec-view-meta{grid-template-columns:1fr;}.radtec-view-meta div{grid-template-columns:1fr;gap:1px;}}",
     ].join("");
     document.head.appendChild(style);
   };
@@ -1034,6 +1219,11 @@
 
   kintone.events.on(EVENTS_SHOW, async function (event) {
     await mount(event);
+    return event;
+  });
+
+  kintone.events.on(EVENTS_DETAIL, async function (event) {
+    await mountViewer(event);
     return event;
   });
 
