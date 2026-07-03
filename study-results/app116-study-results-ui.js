@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-11";
+  const UI_VERSION = "20260703-12";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -403,7 +403,7 @@
   };
 
   const hasExistingPaperMetadata = function (row) {
-    return ["publishedYear", "文字列__1行__2", "coAuthor", "Title", "Journal"].some(function (code) {
+    return ["publishedYear", "coAuthor", "Title", "Journal"].some(function (code) {
       return String(row[code] || "").trim() !== "";
     });
   };
