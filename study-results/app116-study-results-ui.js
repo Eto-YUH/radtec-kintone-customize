@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-5";
+  const UI_VERSION = "20260703-7";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -21,6 +21,7 @@
       roleCode: "ドロップダウン",
       personCode: "文字列__1行__2",
       fields: [
+        { code: "DOIpaper", label: "DOI", type: "text", kintoneType: "SINGLE_LINE_TEXT" },
         { code: "publishedYear", label: "発表年", type: "number", kintoneType: "NUMBER" },
         { code: "ドロップダウン", label: "著者区分", type: "select", kintoneType: "DROP_DOWN", options: ["筆頭著者", "責任著者", "共著者"] },
         { code: "文字列__1行__2", label: "著者", type: "text", kintoneType: "SINGLE_LINE_TEXT" },
@@ -29,7 +30,6 @@
         { code: "Journal", label: "ジャーナル名", type: "text", kintoneType: "SINGLE_LINE_TEXT" },
         { code: "ドロップダウン_7", label: "査読", type: "select", kintoneType: "DROP_DOWN", options: ["有り", "無し"] },
         { code: "採択区分", label: "採択区分", type: "text", kintoneType: "SINGLE_LINE_TEXT" },
-        { code: "DOIpaper", label: "DOI", type: "text", kintoneType: "SINGLE_LINE_TEXT" },
       ],
     },
     {
@@ -387,7 +387,7 @@
       state.counts.paper = paperSection ? countFilledRows(paperSection, state.sections.paper) : state.counts.paper;
       state.notice = "DOIから論文情報を反映しました。";
     } catch (error) {
-      state.notice = "DOIから論文情報を取得できませんでした。DOIの入力内容かCrossref登録状況を確認してください。";
+      state.notice = "DOIから論文情報を取得できませんでした: " + (error && error.message ? error.message : "原因不明");
     }
   };
 
@@ -540,7 +540,6 @@
       '</div>',
       '<div class="radtec-ui-floating-toolbar">',
       '<button type="button" data-action="add-row">行を追加</button>',
-      activeSection.key === "paper" ? '<button type="button" data-action="fetch-doi">DOI取得</button>' : "",
       '<button type="button" data-action="format-names">名前整形</button>',
       '<button type="button" data-action="validate">保存前チェック</button>',
       '</div>',
@@ -554,7 +553,6 @@
       '<div class="radtec-ui-row-head">',
       '<strong>' + escapeHtml(section.label) + ' ' + (rowIndex + 1) + '</strong>',
       '<div class="radtec-ui-row-actions">',
-      section.key === "paper" ? '<button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOI取得</button>' : "",
       '<button type="button" data-action="remove-row" data-row="' + rowIndex + '">削除</button>',
       '</div>',
       '</div>',
@@ -569,6 +567,9 @@
         }
         if (field.code === section.personCode) {
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
+        }
+        if (section.key === "paper" && field.code === "DOIpaper") {
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOI取得</button></div></label>';
         }
         if (field.type === "textarea") {
           return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea></label>';
@@ -718,8 +719,17 @@
           : (state.sections.paper || []).length - 1;
         if (activeSection.key === "paper" && !Number.isNaN(rowIndex)) {
           const row = state.sections.paper[rowIndex];
+          const inlineInput = target.closest(".radtec-ui-inline-field")
+            ? target.closest(".radtec-ui-inline-field").querySelector("input[data-field='DOIpaper']")
+            : null;
+          if (inlineInput) {
+            row.DOIpaper = inlineInput.value;
+          }
           await applyDoiMetadata(row);
           state.validationMessages = [];
+          render();
+        } else {
+          state.notice = "論文タブのDOI取得ボタンとして認識できませんでした。";
           render();
         }
         return;
