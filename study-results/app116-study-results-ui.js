@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-18";
+  const UI_VERSION = "20260703-19";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -232,19 +232,19 @@
     SECTIONS.forEach(function (section) {
       const rows = readRows(record, section);
       rows.forEach(function (row) {
-        applyFieldDefaults(section, row);
+        if (!isEmptyPlaceholder(section, row)) {
+          applyFieldDefaults(section, row);
+        }
         const role = section.roleCode ? String(row[section.roleCode] || "") : "";
         const person = section.personCode ? String(row[section.personCode] || "").trim() : "";
-        if (!hasSubstantiveValue(section, row) || (/^筆頭/.test(role) && !person)) {
+        if (hasSubstantiveValue(section, row) && /^筆頭/.test(role) && !person) {
           syncPersonNameByRole(section, row, next.name, true);
         }
       });
       next.counts[section.key] = countFilledRows(section, rows);
       next.sections[section.key] = rows;
       if (next.sections[section.key].length === 0) {
-        const row = defaultBlankRow(section);
-        syncPersonNameByRole(section, row, next.name, true);
-        next.sections[section.key].push(row);
+        next.sections[section.key].push(defaultBlankRow(section));
       }
     });
     return next;
@@ -259,13 +259,12 @@
   };
 
   const defaultBlankRow = function (section) {
-    const row = blankRow(section);
-    applyFieldDefaults(section, row);
-    return row;
+    return blankRow(section);
   };
 
   const defaultRowForAdd = function (section) {
-    const row = defaultBlankRow(section);
+    const row = blankRow(section);
+    applyFieldDefaults(section, row);
     syncPersonNameByRole(section, row);
     return row;
   };
@@ -275,6 +274,12 @@
       if (field.type === "select" && field.options && field.options.length > 0 && !row[field.code]) {
         row[field.code] = field.options[0];
       }
+    });
+  };
+
+  const isEmptyPlaceholder = function (section, row) {
+    return section.fields.every(function (field) {
+      return String(row[field.code] || "").trim() === "";
     });
   };
 
@@ -724,7 +729,7 @@
         const value = row[field.code] || "";
         const base = 'data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '"';
         if (field.type === "select") {
-          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><select ' + base + '>' + field.options.map(function (option) {
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><select ' + base + '><option value=""' + (value === "" ? " selected" : "") + '></option>' + field.options.map(function (option) {
             return '<option value="' + escapeAttr(option) + '"' + (option === value ? " selected" : "") + '>' + escapeHtml(option) + '</option>';
           }).join("") + '</select></label>';
         }
