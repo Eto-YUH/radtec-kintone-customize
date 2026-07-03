@@ -1,0 +1,7 @@
+*.bak
+*.csv
+*.json
+*.ps1
+*.py
+node_modules/
+dist/
