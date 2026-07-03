@@ -2,6 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
+  const UI_VERSION = "20260703-5";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -520,7 +521,7 @@
 
     root.innerHTML = [
       '<div class="radtec-ui-head">',
-      '<div><strong>研究業績入力補助 試作版</strong><span> 標準フォームと同期して保存します</span></div>',
+      '<div><strong>研究業績入力補助 試作版</strong><span> 標準フォームと同期して保存します / v' + UI_VERSION + '</span></div>',
       '</div>',
       '<div class="radtec-ui-person">',
       '<label>氏名 <small>name</small><input data-name-field value="' + escapeAttr(state.name) + '"></label>',
@@ -539,6 +540,7 @@
       '</div>',
       '<div class="radtec-ui-floating-toolbar">',
       '<button type="button" data-action="add-row">行を追加</button>',
+      activeSection.key === "paper" ? '<button type="button" data-action="fetch-doi">DOI取得</button>' : "",
       '<button type="button" data-action="format-names">名前整形</button>',
       '<button type="button" data-action="validate">保存前チェック</button>',
       '</div>',
@@ -711,7 +713,9 @@
       }
       if (target.dataset.action === "fetch-doi") {
         const activeSection = getActiveSection();
-        const rowIndex = Number(target.dataset.row);
+        const rowIndex = target.dataset.row !== undefined
+          ? Number(target.dataset.row)
+          : (state.sections.paper || []).length - 1;
         if (activeSection.key === "paper" && !Number.isNaN(rowIndex)) {
           const row = state.sections.paper[rowIndex];
           await applyDoiMetadata(row);
