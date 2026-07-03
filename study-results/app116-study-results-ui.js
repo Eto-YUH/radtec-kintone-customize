@@ -142,6 +142,13 @@
   ];
 
   let state = null;
+  let staffNameMap = null;
+
+  const STAFF_DIRECTORY_CONFIG = {
+    appId: "43",
+    nameCode: "Name",
+    englishNameCode: "Name_en",
+  };
 
   const STAFF_NAME_MAP = {
     "竹上和希": "Takegami Kazuki",
@@ -149,6 +156,44 @@
     "寺中悠": "Teranaka Yu",
     "田邊雅博": "Tanabe Masahiro",
     "伊原健一郎": "Ihara Kenichiro",
+  };
+
+  const loadStaffNameMap = async function () {
+    const fallback = Object.assign({}, STAFF_NAME_MAP);
+    if (!STAFF_DIRECTORY_CONFIG.appId || !window.kintone || !kintone.api) {
+      staffNameMap = fallback;
+      return staffNameMap;
+    }
+
+    try {
+      const response = await kintone.api(kintone.api.url("/k/v1/records", true), "GET", {
+        app: STAFF_DIRECTORY_CONFIG.appId,
+        fields: [
+          STAFF_DIRECTORY_CONFIG.nameCode,
+          STAFF_DIRECTORY_CONFIG.englishNameCode,
+        ],
+        query: "limit 500",
+      });
+      (response.records || []).forEach(function (record) {
+        const japaneseName = record[STAFF_DIRECTORY_CONFIG.nameCode]
+          ? record[STAFF_DIRECTORY_CONFIG.nameCode].value
+          : "";
+        const englishName = record[STAFF_DIRECTORY_CONFIG.englishNameCode]
+          ? record[STAFF_DIRECTORY_CONFIG.englishNameCode].value
+          : "";
+        if (japaneseName && englishName) {
+          fallback[normalizeNameKey(japaneseName)] = englishName;
+        }
+      });
+      staffNameMap = fallback;
+      return staffNameMap;
+    } catch (error) {
+      staffNameMap = fallback;
+      if (state) {
+        state.notice = "職員名簿アプリの英語氏名を取得できなかったため、固定の対応表を使用しています。";
+      }
+      return staffNameMap;
+    }
   };
 
   const readField = function (record, code) {
@@ -263,7 +308,8 @@
 
   const toEnglishName = function (value) {
     const text = String(value || "").trim();
-    return STAFF_NAME_MAP[normalizeNameKey(text)] || text;
+    const map = staffNameMap || STAFF_NAME_MAP;
+    return map[normalizeNameKey(text)] || text;
   };
 
   const normalizeNameKey = function (value) {
@@ -459,12 +505,13 @@
     ].join("");
   };
 
-  const mount = function (event) {
+  const mount = async function (event) {
     const oldRoot = document.getElementById(ROOT_ID);
     if (oldRoot) {
       oldRoot.remove();
     }
 
+    await loadStaffNameMap();
     state = buildState(event.record || {});
 
     const root = document.createElement("div");
@@ -732,8 +779,8 @@
 
   wireEvents();
 
-  kintone.events.on(EVENTS_SHOW, function (event) {
-    mount(event);
+  kintone.events.on(EVENTS_SHOW, async function (event) {
+    await mount(event);
     return event;
   });
 
