@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-14";
+  const UI_VERSION = "20260703-15";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -444,7 +444,8 @@
     }
 
     clearDoiMessage(rowIndex);
-    state.notice = "DOIから論文情報を取得しています...";
+    setDoiMessage(rowIndex, "DOIから論文情報を取得しています...");
+    state.notice = "";
     render();
 
     try {
@@ -478,11 +479,11 @@
         return section.key === "paper";
       });
       state.counts.paper = paperSection ? countFilledRows(paperSection, state.sections.paper) : state.counts.paper;
-      clearDoiMessage(rowIndex);
-      state.notice = "DOIから論文情報を反映しました。著者区分は筆頭著者・共著者のどちらか確認してください。";
+      setDoiMessage(rowIndex, "DOIから論文情報を反映しました。著者区分は筆頭著者・共著者のどちらか確認してください。");
+      state.notice = "";
     } catch (error) {
       setDoiMessage(rowIndex, "DOIの登録情報が見つかりませんでした。DOIが正しいか確認してください。");
-      state.notice = "Crossref/DataCiteでDOIを検索しましたが、論文情報を取得できませんでした。";
+      state.notice = "";
     }
   };
 
@@ -832,7 +833,8 @@
           state.validationMessages = [];
           render();
         } else {
-          state.notice = "論文タブのDOI取得ボタンとして認識できませんでした。";
+          setDoiMessage(rowIndex, "論文タブのDOI取得ボタンとして認識できませんでした。");
+          state.notice = "";
           render();
         }
         return;
@@ -960,7 +962,7 @@
       ".radtec-ui-grid label{display:grid;gap:4px;font-weight:700;}",
       ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
       ".radtec-ui-inline-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;}",
-      ".radtec-ui-field-error{margin-top:4px;color:#a33b2f;font-size:12px;font-weight:700;}",
+      ".radtec-ui-field-error{margin-top:4px;color:#66520b;background:#fff9df;border:1px solid #ead898;border-radius:6px;padding:6px 8px;font-size:12px;font-weight:700;}",
       ".radtec-ui-note{margin-top:10px;}",
       "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
     ].join("");
