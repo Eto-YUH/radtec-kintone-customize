@@ -312,6 +312,84 @@
     return map[normalizeNameKey(text)] || text;
   };
 
+  const normalizeDoi = function (value) {
+    return String(value || "")
+      .trim()
+      .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")
+      .replace(/^doi:\s*/i, "");
+  };
+
+  const getCrossrefYear = function (message) {
+    const date = message["published-print"] || message["published-online"] || message.issued || message.created;
+    return date && date["date-parts"] && date["date-parts"][0] ? String(date["date-parts"][0][0] || "") : "";
+  };
+
+  const getCrossrefAuthors = function (message) {
+    return (message.author || []).map(function (author) {
+      if (author.name) {
+        return author.name;
+      }
+      return [author.family, author.given].filter(Boolean).join(" ");
+    }).filter(Boolean);
+  };
+
+  const fetchCrossrefWork = async function (doi) {
+    const response = await fetch("https://api.crossref.org/works/" + encodeURIComponent(doi), {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error("Crossref response: " + response.status);
+    }
+    const data = await response.json();
+    return data && data.message ? data.message : null;
+  };
+
+  const applyDoiMetadata = async function (row) {
+    const doi = normalizeDoi(row.DOIpaper);
+    if (!doi) {
+      state.notice = "DOIを入力してから取得してください。";
+      return;
+    }
+
+    state.notice = "DOIから論文情報を取得しています...";
+    render();
+
+    try {
+      const message = await fetchCrossrefWork(doi);
+      if (!message) {
+        state.notice = "DOIから論文情報を取得できませんでした。";
+        return;
+      }
+      const title = Array.isArray(message.title) ? message.title[0] : "";
+      const journal = Array.isArray(message["container-title"]) ? message["container-title"][0] : "";
+      const year = getCrossrefYear(message);
+      const authors = getCrossrefAuthors(message);
+
+      row.DOIpaper = doi;
+      if (title) {
+        row.Title = title;
+      }
+      if (journal) {
+        row.Journal = journal;
+      }
+      if (year) {
+        row.publishedYear = year;
+      }
+      if (authors.length > 0) {
+        row["文字列__1行__2"] = authors[0];
+        row.coAuthor = authors.join(", ");
+      }
+
+      const paperSection = SECTIONS.find(function (section) {
+        return section.key === "paper";
+      });
+      state.counts.paper = paperSection ? countFilledRows(paperSection, state.sections.paper) : state.counts.paper;
+      state.notice = "DOIから論文情報を反映しました。";
+    } catch (error) {
+      state.notice = "DOIから論文情報を取得できませんでした。DOIの入力内容かCrossref登録状況を確認してください。";
+    }
+  };
+
   const normalizeNameKey = function (value) {
     return String(value || "").replace(/[\s\u3000]+/g, "");
   };
@@ -421,7 +499,7 @@
     (state.sections.paper || []).forEach(function (row) {
       const doi = getValue(row, "DOIpaper");
       if (/^https:\/\/doi\.org\/10\./i.test(doi)) {
-        row.DOIpaper = doi.replace(/^https:\/\/doi\.org\//i, "");
+        row.DOIpaper = normalizeDoi(doi);
       }
     });
   };
@@ -494,6 +572,9 @@
         }
         if (field.code === section.personCode) {
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
+        }
+        if (section.key === "paper" && field.code === "DOIpaper") {
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="fetch-doi" data-row="' + rowIndex + '">DOI取得</button></div></label>';
         }
         if (field.type === "textarea") {
           return '<label class="is-wide">' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><textarea ' + base + '>' + escapeHtml(value) + '</textarea></label>';
@@ -605,7 +686,7 @@
       handleFieldChange(target);
     });
 
-    document.addEventListener("click", function (event) {
+    document.addEventListener("click", async function (event) {
       const target = event.target.closest("button");
       const root = document.getElementById(ROOT_ID);
       if (!target || !root || !root.contains(target) || !state) {
@@ -634,6 +715,17 @@
         }
         state.counts[activeSection.key] = countFilledRows(activeSection, state.sections[activeSection.key]);
         render();
+        return;
+      }
+      if (target.dataset.action === "fetch-doi") {
+        const activeSection = getActiveSection();
+        const rowIndex = Number(target.dataset.row);
+        if (activeSection.key === "paper" && !Number.isNaN(rowIndex)) {
+          const row = state.sections.paper[rowIndex];
+          await applyDoiMetadata(row);
+          state.validationMessages = [];
+          render();
+        }
         return;
       }
       if (target.dataset.action === "convert-author-name") {
