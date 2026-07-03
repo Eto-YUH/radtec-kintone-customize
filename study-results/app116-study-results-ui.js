@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-20";
+  const UI_VERSION = "20260703-21";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -230,11 +230,11 @@
       sections: {},
     };
     SECTIONS.forEach(function (section) {
-      const rows = readRows(record, section);
+      const rows = readRows(record, section).filter(function (row) {
+        return hasSubstantiveValue(section, row);
+      });
       rows.forEach(function (row) {
-        if (!isEmptyPlaceholder(section, row)) {
-          applyFieldDefaults(section, row);
-        }
+        applyFieldDefaults(section, row);
         const role = section.roleCode ? String(row[section.roleCode] || "") : "";
         const person = section.personCode ? String(row[section.personCode] || "").trim() : "";
         if (hasSubstantiveValue(section, row) && /^筆頭/.test(role) && !person) {
@@ -267,12 +267,6 @@
       if (field.type === "select" && field.options && field.options.length > 0 && !row[field.code]) {
         row[field.code] = field.options[0];
       }
-    });
-  };
-
-  const isEmptyPlaceholder = function (section, row) {
-    return section.fields.every(function (field) {
-      return String(row[field.code] || "").trim() === "";
     });
   };
 
