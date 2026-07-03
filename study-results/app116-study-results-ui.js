@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-17";
+  const UI_VERSION = "20260703-18";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -580,15 +580,6 @@
       || field.code === "DOIpaper";
   };
 
-  const getYearChoices = function (value) {
-    const numeric = Number(value);
-    const base = Number.isFinite(numeric) && numeric >= 1900 ? numeric : new Date().getFullYear();
-    const start = base - 4;
-    return Array.from({ length: 9 }, function (_, index) {
-      return String(start + index);
-    });
-  };
-
   const validateState = function () {
     const messages = [];
     const seen = {};
@@ -738,9 +729,7 @@
           }).join("") + '</select></label>';
         }
         if (field.type === "number" && /年/.test(field.label)) {
-          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><input type="text" inputmode="numeric" value="' + escapeAttr(value) + '" ' + base + '><div class="radtec-ui-year-grid">' + getYearChoices(value).map(function (year) {
-            return '<button type="button" class="' + (String(value) === year ? "is-active" : "") + '" data-action="set-year" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '" data-year="' + year + '">' + year + '</button>';
-          }).join("") + '</div></label>';
+          return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><input type="text" inputmode="numeric" value="' + escapeAttr(value) + '" ' + base + '></label>';
         }
         if (field.code === section.personCode) {
           return '<label>' + escapeHtml(field.label) + '<small>' + escapeHtml(field.code) + '</small><div class="radtec-ui-inline-field"><input type="' + field.type + '" value="' + escapeAttr(value) + '" ' + base + '><button type="button" data-action="convert-author-name" data-row="' + rowIndex + '" data-field="' + escapeAttr(field.code) + '">英語変換</button></div></label>';
@@ -891,18 +880,6 @@
         render();
         return;
       }
-      if (target.dataset.action === "set-year") {
-        const activeSection = getActiveSection();
-        const rowIndex = Number(target.dataset.row);
-        const fieldCode = target.dataset.field;
-        if (!Number.isNaN(rowIndex) && fieldCode && state.sections[activeSection.key][rowIndex]) {
-          state.sections[activeSection.key][rowIndex][fieldCode] = target.dataset.year || "";
-          state.counts[activeSection.key] = countFilledRows(activeSection, state.sections[activeSection.key]);
-          state.validationMessages = [];
-          render();
-        }
-        return;
-      }
       if (target.dataset.action === "fetch-doi") {
         const activeSection = getActiveSection();
         const rowIndex = target.dataset.row !== undefined
@@ -1044,9 +1021,6 @@
       ".radtec-ui-grid label{display:grid;gap:4px;font-weight:700;}",
       ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
       ".radtec-ui-inline-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;}",
-      ".radtec-ui-year-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:4px;}",
-      ".radtec-ui-year-grid button{padding:4px 6px;font-size:12px;font-weight:700;}",
-      ".radtec-ui-year-grid button.is-active{background:#256fa8 !important;border-color:#256fa8 !important;color:#fff !important;}",
       ".radtec-ui-field-error{margin-top:4px;color:#66520b;background:#fff9df;border:1px solid #ead898;border-radius:6px;padding:6px 8px;font-size:12px;font-weight:700;}",
       ".radtec-ui-field-help{margin-top:4px;color:#607284;font-size:12px;font-weight:500;}",
       ".radtec-ui-note{margin-top:10px;}",
