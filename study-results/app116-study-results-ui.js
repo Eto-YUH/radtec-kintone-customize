@@ -2,7 +2,7 @@
   "use strict";
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
-  const UI_VERSION = "20260703-19";
+  const UI_VERSION = "20260703-20";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -243,9 +243,6 @@
       });
       next.counts[section.key] = countFilledRows(section, rows);
       next.sections[section.key] = rows;
-      if (next.sections[section.key].length === 0) {
-        next.sections[section.key].push(defaultBlankRow(section));
-      }
     });
     return next;
   };
@@ -256,10 +253,6 @@
       row[field.code] = "";
     });
     return row;
-  };
-
-  const defaultBlankRow = function (section) {
-    return blankRow(section);
   };
 
   const defaultRowForAdd = function (section) {
@@ -876,10 +869,8 @@
       if (target.dataset.action === "remove-row") {
         const activeSection = getActiveSection();
         const rowIndex = Number(target.dataset.row);
-        if (state.sections[activeSection.key].length > 1) {
+        if (!Number.isNaN(rowIndex)) {
           state.sections[activeSection.key].splice(rowIndex, 1);
-        } else {
-          state.sections[activeSection.key][0] = defaultBlankRow(activeSection);
         }
         state.counts[activeSection.key] = countFilledRows(activeSection, state.sections[activeSection.key]);
         render();
