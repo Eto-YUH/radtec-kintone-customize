@@ -532,18 +532,10 @@
         return '<button type="button" class="' + (section.key === state.active ? "is-active" : "") + '" data-tab="' + section.key + '"><span>' + escapeHtml(section.label) + '</span> <small>' + state.counts[section.key] + '件</small></button>';
       }).join(""),
       '</div>',
-      '<div class="radtec-ui-toolbar">',
-      '<strong>' + escapeHtml(activeSection.label) + '</strong>',
-      '<button type="button" data-action="add-row">行を追加</button>',
-      '</div>',
       '<div class="radtec-ui-rows">',
       rows.map(function (row, rowIndex) {
         return renderRow(activeSection, row, rowIndex);
       }).join(""),
-      '</div>',
-      '<div class="radtec-ui-bottom-toolbar">',
-      '<button type="button" data-action="add-row">行を追加</button>',
-      '<span>' + escapeHtml(activeSection.label) + 'に新しい行を追加します</span>',
       '</div>',
       '<div class="radtec-ui-floating-toolbar">',
       '<button type="button" data-action="add-row">行を追加</button>',
@@ -828,9 +820,7 @@
       "#" + ROOT_ID + " button{border:1px solid #bdd0df;border-radius:6px;background:#fff;padding:6px 10px;cursor:pointer;font-weight:700;}",
       "#" + ROOT_ID + " input,#" + ROOT_ID + " textarea,#" + ROOT_ID + " select{width:100%;box-sizing:border-box;border:1px solid #cbd9e4;border-radius:6px;padding:7px 8px;background:#fff;}",
       "#" + ROOT_ID + " textarea{min-height:68px;resize:vertical;}",
-      ".radtec-ui-head,.radtec-ui-toolbar,.radtec-ui-row-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}",
-      ".radtec-ui-bottom-toolbar{display:flex;align-items:center;gap:10px;justify-content:flex-end;margin-top:10px;}",
-      ".radtec-ui-bottom-toolbar span{color:#607284;font-size:12px;}",
+      ".radtec-ui-head,.radtec-ui-row-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}",
       ".radtec-ui-floating-toolbar{position:sticky;bottom:12px;z-index:20;display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding:10px;border:1px solid #bdd0df;border-radius:8px;background:rgba(247,251,254,.96);box-shadow:0 8px 24px rgba(31,56,80,.14);}",
       ".radtec-ui-floating-toolbar button{background:#fff;}",
       ".radtec-ui-floating-toolbar button:last-child{background:#256fa8 !important;border-color:#256fa8 !important;color:#fff !important;}",
@@ -853,7 +843,7 @@
       ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
       ".radtec-ui-inline-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;}",
       ".radtec-ui-note{margin-top:10px;}",
-      "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-toolbar,.radtec-ui-row-head,.radtec-ui-bottom-toolbar{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
+      "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
     ].join("");
     document.head.appendChild(style);
   };
