@@ -4,7 +4,7 @@
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
   const DASHBOARD_ROOT_ID = "radtec-study-results-dashboard";
-  const UI_VERSION = "20260706-2";
+  const UI_VERSION = "20260706-3";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -977,6 +977,7 @@
           return;
         }
         const year = Number(getValue(row, getYearCode(section))) || 0;
+        const contributorListCode = getContributorListCode(section);
         items.push({
           section: section,
           row: row,
@@ -984,6 +985,7 @@
           title: getValue(row, getTitleCode(section)),
           role: section.roleCode ? getValue(row, section.roleCode) : "",
           person: section.personCode ? getValue(row, section.personCode) : "",
+          contributors: contributorListCode ? getValue(row, contributorListCode) : "",
           issues: getViewerIssues(section, row),
           isHpPublic: HP_PUBLIC_SECTION_KEYS.indexOf(section.key) !== -1,
         });
@@ -1046,7 +1048,7 @@
   };
 
   const renderDashboardBar = function (label, count, maxCount, className) {
-    const width = maxCount > 0 ? Math.max(6, Math.round((count / maxCount) * 100)) : 0;
+    const width = count > 0 && maxCount > 0 ? Math.max(8, Math.round((count / maxCount) * 100)) : 0;
     return [
       '<div class="radtec-dash-bar-row">',
       '<div class="radtec-dash-bar-label">' + escapeHtml(label) + '</div>',
@@ -1108,7 +1110,23 @@
       items.slice().sort(function (a, b) {
         return b.year - a.year;
       }).slice(0, 8).map(function (item) {
-        return '<li><span>' + escapeHtml(item.year || "年未入力") + '</span><strong>' + escapeHtml(item.section.label) + '</strong>' + escapeHtml(item.title || "タイトル未入力") + '</li>';
+        return [
+          '<li>',
+          '<div class="radtec-dash-item-head">',
+          '<span>' + escapeHtml(item.year || "年未入力") + '</span>',
+          '<strong>' + escapeHtml(item.section.label) + '</strong>',
+          item.role ? '<em>' + escapeHtml(item.role) + '</em>' : '',
+          '</div>',
+          '<div class="radtec-dash-item-title">' + escapeHtml(item.title || "タイトル未入力") + '</div>',
+          '<dl class="radtec-dash-item-meta">',
+          item.person ? '<div><dt>本人</dt><dd>' + escapeHtml(item.person) + '</dd></div>' : '',
+          item.contributors ? '<div><dt>著者・演者</dt><dd>' + escapeHtml(item.contributors) + '</dd></div>' : '',
+          item.issues.length ? '<div><dt>要確認</dt><dd>' + item.issues.map(function (issue) {
+            return '<b>' + escapeHtml(issue) + '</b>';
+          }).join("") + '</dd></div>' : '',
+          '</dl>',
+          '</li>',
+        ].join("");
       }).join(""),
       '</ul>',
     ].join("");
@@ -1563,16 +1581,24 @@
       ".radtec-dash-bar{height:100%;border-radius:999px;background:#256fa8;}",
       ".radtec-dash-bar.is-section{background:#3c8f66;}",
       ".radtec-dash-bar-value{text-align:right;font-weight:800;color:#20364a;font-size:12px;}",
-      ".radtec-dash-list{margin:0;padding:0;list-style:none;display:grid;gap:6px;}",
-      ".radtec-dash-list li{display:grid;grid-template-columns:50px 74px minmax(0,1fr);gap:6px;align-items:start;border-top:1px solid #eef3f6;padding-top:6px;color:#20364a;overflow-wrap:anywhere;}",
+      ".radtec-dash-list{margin:0;padding:0;list-style:none;display:grid;gap:8px;}",
+      ".radtec-dash-list li{border-top:1px solid #eef3f6;padding-top:8px;color:#20364a;overflow-wrap:anywhere;}",
       ".radtec-dash-list li:first-child{border-top:0;padding-top:0;}",
-      ".radtec-dash-list span{font-weight:800;color:#256fa8;}",
-      ".radtec-dash-list strong{font-size:12px;color:#516475;}",
+      ".radtec-dash-item-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;}",
+      ".radtec-dash-item-head span{font-weight:800;color:#256fa8;}",
+      ".radtec-dash-item-head strong{font-size:12px;color:#516475;}",
+      ".radtec-dash-item-head em{font-style:normal;border:1px solid #d4e0e8;border-radius:999px;background:#f7fbfe;padding:2px 7px;color:#425466;font-size:12px;font-weight:800;}",
+      ".radtec-dash-item-title{font-weight:800;color:#20364a;line-height:1.45;}",
+      ".radtec-dash-item-meta{display:grid;gap:3px;margin:6px 0 0;}",
+      ".radtec-dash-item-meta div{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;}",
+      ".radtec-dash-item-meta dt{color:#607284;font-size:12px;font-weight:800;}",
+      ".radtec-dash-item-meta dd{margin:0;color:#425466;}",
+      ".radtec-dash-item-meta b{display:inline-block;margin:0 4px 4px 0;border:1px solid #e7bd83;border-radius:999px;background:#fff7e8;padding:2px 7px;color:#7a4b00;font-size:12px;}",
       ".radtec-dash-empty,.radtec-dash-loading,.radtec-dash-error{padding:12px;border:1px dashed #cbd9e4;border-radius:8px;background:#fff;color:#607284;}",
       ".radtec-dash-error{border-color:#e0a3a3;background:#fff0f0;color:#7a2d2d;font-weight:700;}",
       "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
       "@media(max-width:760px){.radtec-view-head{align-items:flex-start;flex-direction:column;}.radtec-view-card-main{grid-template-columns:1fr;}.radtec-view-meta{grid-template-columns:1fr;}.radtec-view-meta div{grid-template-columns:1fr;gap:1px;}}",
-      "@media(max-width:960px){.radtec-dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.radtec-dash-grid{grid-template-columns:1fr;}.radtec-dash-head{align-items:flex-start;flex-direction:column;}.radtec-dash-list li{grid-template-columns:44px 68px minmax(0,1fr);}}",
+      "@media(max-width:960px){.radtec-dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.radtec-dash-grid{grid-template-columns:1fr;}.radtec-dash-head{align-items:flex-start;flex-direction:column;}.radtec-dash-item-meta div{grid-template-columns:1fr;gap:1px;}}",
     ].join("");
     document.head.appendChild(style);
   };
