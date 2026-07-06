@@ -4,7 +4,7 @@
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
   const DASHBOARD_ROOT_ID = "radtec-study-results-dashboard";
-  const UI_VERSION = "20260706-4";
+  const UI_VERSION = "20260706-5";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -1009,7 +1009,7 @@
     return {
       people: people,
       selectedName: people[0] ? people[0].name : "",
-      years: 5,
+      years: "all",
       fiscalYear: getCurrentFiscalYear(),
       error: "",
     };
@@ -1026,7 +1026,16 @@
 
   const summarizeDashboardPerson = function (person) {
     const fiscalYear = dashboardState.fiscalYear;
-    const startYear = fiscalYear - dashboardState.years + 1;
+    const numericYears = Number(dashboardState.years);
+    const years = dashboardState.years === "all" ? "all" : (numericYears || 5);
+    const validYears = person.items.map(function (item) {
+      return item.year;
+    }).filter(function (year) {
+      return year > 0;
+    });
+    const startYear = years === "all"
+      ? (validYears.length ? Math.min.apply(null, validYears) : fiscalYear)
+      : fiscalYear - years + 1;
     const recentItems = person.items.filter(function (item) {
       return item.year >= startYear && item.year <= fiscalYear;
     });
@@ -1041,6 +1050,7 @@
     });
     return {
       startYear: startYear,
+      years: years,
       recentItems: recentItems,
       fiscalItems: fiscalItems,
       issueItems: issueItems,
@@ -1172,15 +1182,15 @@
       }).join(""),
       '</select></label>',
       '<label>直近<select data-dashboard-years>',
-      [3, 5, 7, 10].map(function (yearCount) {
-        return '<option value="' + yearCount + '"' + (yearCount === dashboardState.years ? " selected" : "") + '>' + yearCount + '年</option>';
+      [{ value: "all", label: "全て" }, { value: "3", label: "3年" }, { value: "5", label: "5年" }, { value: "7", label: "7年" }, { value: "10", label: "10年" }].map(function (option) {
+        return '<option value="' + option.value + '"' + (String(option.value) === String(dashboardState.years) ? " selected" : "") + '>' + option.label + '</option>';
       }).join(""),
       '</select></label>',
       '</div>',
       '</div>',
       '<div class="radtec-dash-kpis">',
       '<div><span>今年度</span><strong>' + summary.fiscalItems.length + '</strong><small>' + dashboardState.fiscalYear + '年度</small></div>',
-      '<div><span>直近' + dashboardState.years + '年</span><strong>' + summary.recentItems.length + '</strong><small>' + summary.startYear + '-' + dashboardState.fiscalYear + '</small></div>',
+      '<div><span>' + (summary.years === "all" ? "全期間" : "直近" + summary.years + "年") + '</span><strong>' + summary.recentItems.length + '</strong><small>' + summary.startYear + '-' + dashboardState.fiscalYear + '</small></div>',
       '<div><span>総数</span><strong>' + person.items.length + '</strong><small>全期間</small></div>',
       '<div class="' + evaluation.className + '"><span>評価目安</span><strong>' + escapeHtml(evaluation.label) + '</strong><small>面談補助</small></div>',
       '<div class="' + (summary.hpIssueItems.length ? "is-low" : "is-good") + '"><span>HP要確認</span><strong>' + summary.hpIssueItems.length + '</strong><small>未入力等</small></div>',
@@ -1338,7 +1348,7 @@
           return;
         }
         if (target.matches("[data-dashboard-years]")) {
-          dashboardState.years = Number(target.value) || 5;
+          dashboardState.years = target.value === "all" ? "all" : (Number(target.value) || 5);
           renderDashboard();
           return;
         }
