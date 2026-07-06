@@ -4,7 +4,7 @@
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
   const DASHBOARD_ROOT_ID = "radtec-study-results-dashboard";
-  const UI_VERSION = "20260706-1";
+  const UI_VERSION = "20260706-2";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -151,6 +151,7 @@
   ];
   const CONTRIBUTOR_CHECK_SECTION_KEYS = ["paper", "domestic", "international", "seminar"];
   const HP_PUBLIC_SECTION_KEYS = ["paper", "domestic", "international", "seminar"];
+  const DASHBOARD_VIEW_NAME_PATTERN = /面談|ダッシュボード|dashboard/i;
 
   let state = null;
   let staffNameMap = null;
@@ -1174,11 +1175,20 @@
     ].join("");
   };
 
-  const mountDashboard = async function () {
+  const removeDashboard = function () {
     const oldRoot = document.getElementById(DASHBOARD_ROOT_ID);
     if (oldRoot) {
       oldRoot.remove();
     }
+    dashboardState = null;
+  };
+
+  const shouldShowDashboard = function (event) {
+    return DASHBOARD_VIEW_NAME_PATTERN.test(String(event.viewName || ""));
+  };
+
+  const mountDashboard = async function () {
+    removeDashboard();
     const root = document.createElement("div");
     root.id = DASHBOARD_ROOT_ID;
     root.innerHTML = '<div class="radtec-dash-loading">研究業績を集計しています...</div>';
@@ -1581,6 +1591,10 @@
   wireEvents();
 
   kintone.events.on(EVENTS_INDEX, async function (event) {
+    if (!shouldShowDashboard(event)) {
+      removeDashboard();
+      return event;
+    }
     await mountDashboard();
     return event;
   });
