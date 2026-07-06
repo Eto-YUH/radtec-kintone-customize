@@ -4,7 +4,7 @@
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
   const DASHBOARD_ROOT_ID = "radtec-study-results-dashboard";
-  const UI_VERSION = "20260706-5";
+  const UI_VERSION = "20260706-6";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -1503,115 +1503,7 @@
   };
 
   const injectStyle = function () {
-    if (document.getElementById(ROOT_ID + "-style")) {
-      return;
-    }
-    const style = document.createElement("style");
-    style.id = ROOT_ID + "-style";
-    style.textContent = [
-      "#" + ROOT_ID + "{margin:12px 0;padding:14px;border:1px solid #b7d6ea;border-radius:8px;background:#f7fbfe;color:#24384a;font-size:14px;line-height:1.5;}",
-      "#" + ROOT_ID + " button{border:1px solid #bdd0df;border-radius:6px;background:#fff;padding:6px 10px;cursor:pointer;font-weight:700;}",
-      "#" + ROOT_ID + " input,#" + ROOT_ID + " textarea,#" + ROOT_ID + " select{width:100%;box-sizing:border-box;border:1px solid #cbd9e4;border-radius:6px;padding:7px 8px;background:#fff;}",
-      "#" + ROOT_ID + " textarea{min-height:68px;resize:vertical;}",
-      ".radtec-ui-head,.radtec-ui-row-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}",
-      ".radtec-ui-floating-toolbar{position:sticky;bottom:12px;z-index:20;display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding:10px;border:1px solid #bdd0df;border-radius:8px;background:rgba(247,251,254,.96);box-shadow:0 8px 24px rgba(31,56,80,.14);}",
-      ".radtec-ui-floating-toolbar button{background:#fff;}",
-      ".radtec-ui-floating-toolbar button:last-child{background:#256fa8 !important;border-color:#256fa8 !important;color:#fff !important;}",
-      ".radtec-ui-head{margin-bottom:10px;}",
-      ".radtec-ui-head span,.radtec-ui-note, #" + ROOT_ID + " small{color:#607284;font-size:12px;font-weight:500;}",
-      ".radtec-ui-person{margin:10px 0;max-width:360px;}",
-      ".radtec-ui-notice{margin:8px 0;padding:8px 10px;border:1px solid #d7c58b;border-radius:6px;background:#fff9df;color:#66520b;font-weight:700;}",
-      ".radtec-ui-validation{margin:8px 0;padding:10px 12px;border:1px solid #e0a3a3;border-radius:6px;background:#fff0f0;color:#7a2d2d;}",
-      ".radtec-ui-validation ul{margin:6px 0 0 18px;padding:0;}",
-      ".radtec-ui-validation li{margin:3px 0;}",
-      ".radtec-ui-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;}",
-      ".radtec-ui-tabs button{color:#24384a !important;background:#fff !important;}",
-      ".radtec-ui-tabs button span{color:#24384a !important;}",
-      ".radtec-ui-tabs button.is-active{background:#256fa8 !important;border-color:#256fa8 !important;color:#fff !important;}",
-      ".radtec-ui-tabs button.is-active span{color:#fff !important;}",
-      ".radtec-ui-tabs button.is-active small{color:#e8f4ff !important;}",
-      ".radtec-ui-row{border:1px solid #d8e5ee;border-radius:8px;background:#fff;margin-top:10px;padding:12px;}",
-      ".radtec-ui-row-actions{display:flex;gap:6px;align-items:center;}",
-      ".radtec-ui-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;}",
-      ".radtec-ui-grid label{display:grid;gap:4px;font-weight:700;}",
-      ".radtec-ui-grid label.is-wide{grid-column:1/-1;}",
-      ".radtec-ui-inline-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;}",
-      ".radtec-ui-field-error{margin-top:4px;color:#66520b;background:#fff9df;border:1px solid #ead898;border-radius:6px;padding:6px 8px;font-size:12px;font-weight:700;}",
-      ".radtec-ui-field-help{margin-top:4px;color:#607284;font-size:12px;font-weight:500;}",
-      ".radtec-ui-note{margin-top:10px;}",
-      "#" + VIEW_ROOT_ID + "{margin:12px 0;padding:14px;border:1px solid #c8d6df;border-radius:8px;background:#fbfcfd;color:#24384a;font-size:14px;line-height:1.55;}",
-      ".radtec-view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;}",
-      ".radtec-view-head strong{font-size:16px;}",
-      ".radtec-view-head span,.radtec-view-note{color:#607284;font-size:12px;font-weight:500;}",
-      ".radtec-view-person-name{font-size:18px;font-weight:800;margin:8px 0 12px;}",
-      ".radtec-view-summary{display:flex;gap:8px;flex-wrap:wrap;}",
-      ".radtec-view-summary span,.radtec-view-badges span{display:inline-flex;align-items:center;border:1px solid #d4e0e8;border-radius:999px;background:#fff;padding:3px 8px;font-size:12px;font-weight:700;color:#425466;}",
-      ".radtec-view-summary span.has-issues,.radtec-view-badges span.is-issue{border-color:#e7bd83;background:#fff7e8;color:#7a4b00;}",
-      ".radtec-view-badges span.is-public{border-color:#aed3c0;background:#eef9f2;color:#235b38;}",
-      ".radtec-view-section{margin-top:14px;}",
-      ".radtec-view-section h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:15px;}",
-      ".radtec-view-section h3 span{color:#607284;font-size:12px;font-weight:700;}",
-      ".radtec-view-list{display:grid;gap:8px;}",
-      ".radtec-view-card{border:1px solid #d9e3ea;border-radius:8px;background:#fff;padding:10px;}",
-      ".radtec-view-card.has-issues{border-color:#e7bd83;background:#fffdf8;}",
-      ".radtec-view-card-main{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;}",
-      ".radtec-view-year{font-weight:800;color:#256fa8;}",
-      ".radtec-view-title{font-weight:800;color:#20364a;overflow-wrap:anywhere;}",
-      ".radtec-view-title a{color:#1f6fa8;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;}",
-      ".radtec-view-person{margin-top:3px;color:#516475;font-size:13px;}",
-      ".radtec-view-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin:8px 0 0;}",
-      ".radtec-view-meta div{display:grid;grid-template-columns:82px minmax(0,1fr);gap:6px;}",
-      ".radtec-view-meta dt{color:#607284;font-size:12px;font-weight:700;}",
-      ".radtec-view-meta dd{margin:0;overflow-wrap:anywhere;}",
-      ".radtec-view-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}",
-      ".radtec-view-empty{padding:14px;border:1px dashed #cbd9e4;border-radius:8px;background:#fff;color:#607284;}",
-      ".radtec-view-note{margin-top:12px;}",
-      "#" + DASHBOARD_ROOT_ID + "{margin:12px 0 16px;padding:14px;border:1px solid #c8d6df;border-radius:8px;background:#fbfcfd;color:#24384a;font-size:14px;line-height:1.55;}",
-      "#" + DASHBOARD_ROOT_ID + " select{box-sizing:border-box;border:1px solid #cbd9e4;border-radius:6px;background:#fff;padding:6px 28px 6px 8px;min-width:150px;}",
-      ".radtec-dash-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}",
-      ".radtec-dash-head strong{font-size:16px;}",
-      ".radtec-dash-head span{display:block;color:#607284;font-size:12px;font-weight:500;}",
-      ".radtec-dash-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:end;}",
-      ".radtec-dash-controls label{display:grid;gap:3px;color:#607284;font-size:12px;font-weight:700;}",
-      ".radtec-dash-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px;}",
-      ".radtec-dash-kpis div{border:1px solid #d9e3ea;border-radius:8px;background:#fff;padding:10px;min-height:68px;}",
-      ".radtec-dash-kpis span{display:block;color:#607284;font-size:12px;font-weight:700;}",
-      ".radtec-dash-kpis strong{display:block;margin-top:2px;font-size:20px;line-height:1.25;color:#20364a;overflow-wrap:anywhere;}",
-      ".radtec-dash-kpis small{display:block;margin-top:2px;color:#607284;font-size:11px;}",
-      ".radtec-dash-kpis .is-high{border-color:#94c7ad;background:#eef9f2;}",
-      ".radtec-dash-kpis .is-good{border-color:#b7d6ea;background:#f2f9fd;}",
-      ".radtec-dash-kpis .is-mid{border-color:#d8cf96;background:#fffbe8;}",
-      ".radtec-dash-kpis .is-low{border-color:#e7bd83;background:#fff7e8;}",
-      ".radtec-dash-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}",
-      ".radtec-dash-grid section{border:1px solid #d9e3ea;border-radius:8px;background:#fff;padding:10px;}",
-      ".radtec-dash-grid h3{margin:0 0 8px;font-size:14px;}",
-      ".radtec-dash-chart{display:grid;gap:7px;}",
-      ".radtec-dash-bar-row{display:grid;grid-template-columns:86px minmax(0,1fr) 28px;gap:8px;align-items:center;}",
-      ".radtec-dash-bar-label{font-size:12px;font-weight:700;color:#516475;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
-      ".radtec-dash-bar-track{height:13px;border-radius:999px;background:#eef3f6;overflow:hidden;}",
-      ".radtec-dash-bar{height:100%;border-radius:999px;background:#256fa8;}",
-      ".radtec-dash-bar.is-section{background:#3c8f66;}",
-      ".radtec-dash-bar-value{text-align:right;font-weight:800;color:#20364a;font-size:12px;}",
-      ".radtec-dash-list{margin:0;padding:0;list-style:none;display:grid;gap:8px;}",
-      ".radtec-dash-list li{border-top:1px solid #eef3f6;padding-top:8px;color:#20364a;overflow-wrap:anywhere;}",
-      ".radtec-dash-list li:first-child{border-top:0;padding-top:0;}",
-      ".radtec-dash-item-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;}",
-      ".radtec-dash-item-head span{font-weight:800;color:#256fa8;}",
-      ".radtec-dash-item-head strong{font-size:12px;color:#516475;}",
-      ".radtec-dash-item-head em{font-style:normal;border:1px solid #d4e0e8;border-radius:999px;background:#f7fbfe;padding:2px 7px;color:#425466;font-size:12px;font-weight:800;}",
-      ".radtec-dash-item-title{font-weight:800;color:#20364a;line-height:1.45;}",
-      ".radtec-dash-item-meta{display:grid;gap:3px;margin:6px 0 0;}",
-      ".radtec-dash-item-meta div{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;}",
-      ".radtec-dash-item-meta dt{color:#607284;font-size:12px;font-weight:800;}",
-      ".radtec-dash-item-meta dd{margin:0;color:#425466;}",
-      ".radtec-dash-item-meta b{display:inline-block;margin:0 4px 4px 0;border:1px solid #e7bd83;border-radius:999px;background:#fff7e8;padding:2px 7px;color:#7a4b00;font-size:12px;}",
-      ".radtec-dash-empty,.radtec-dash-loading,.radtec-dash-error{padding:12px;border:1px dashed #cbd9e4;border-radius:8px;background:#fff;color:#607284;}",
-      ".radtec-dash-error{border-color:#e0a3a3;background:#fff0f0;color:#7a2d2d;font-weight:700;}",
-      "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
-      "@media(max-width:760px){.radtec-view-head{align-items:flex-start;flex-direction:column;}.radtec-view-card-main{grid-template-columns:1fr;}.radtec-view-meta{grid-template-columns:1fr;}.radtec-view-meta div{grid-template-columns:1fr;gap:1px;}}",
-      "@media(max-width:960px){.radtec-dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.radtec-dash-grid{grid-template-columns:1fr;}.radtec-dash-head{align-items:flex-start;flex-direction:column;}.radtec-dash-item-meta div{grid-template-columns:1fr;gap:1px;}}",
-    ].join("");
-    document.head.appendChild(style);
+    // Styles are loaded from app116-study-results-ui.css in kintone customization settings.
   };
 
   const escapeHtml = function (value) {
@@ -1650,3 +1542,4 @@
     return writeBack(event);
   });
 })();
+
