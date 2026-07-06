@@ -4,7 +4,7 @@
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
   const DASHBOARD_ROOT_ID = "radtec-study-results-dashboard";
-  const UI_VERSION = "20260706-3";
+  const UI_VERSION = "20260706-4";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -992,6 +992,7 @@
       });
     });
     return {
+      recordId: Number(readField(record, "$id")) || 0,
       name: viewState.name || "氏名未入力",
       items: items,
     };
@@ -1003,7 +1004,7 @@
         return person.name && person.name !== "氏名未入力";
       })
       .sort(function (a, b) {
-        return a.name.localeCompare(b.name, "ja");
+        return a.recordId - b.recordId;
       });
     return {
       people: people,
