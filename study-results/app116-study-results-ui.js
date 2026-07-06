@@ -3,7 +3,8 @@
 
   const ROOT_ID = "radtec-study-results-ui-prototype";
   const VIEW_ROOT_ID = "radtec-study-results-viewer";
-  const UI_VERSION = "20260703-24";
+  const DASHBOARD_ROOT_ID = "radtec-study-results-dashboard";
+  const UI_VERSION = "20260706-1";
 
   const EVENTS_SHOW = [
     "app.record.create.show",
@@ -11,6 +12,9 @@
   ];
   const EVENTS_DETAIL = [
     "app.record.detail.show",
+  ];
+  const EVENTS_INDEX = [
+    "app.record.index.show",
   ];
   const EVENTS_SUBMIT = [
     "app.record.create.submit",
@@ -150,6 +154,7 @@
 
   let state = null;
   let staffNameMap = null;
+  let dashboardState = null;
 
   const STAFF_DIRECTORY_CONFIG = {
     appId: "43",
@@ -935,6 +940,272 @@
     renderViewer(viewState);
   };
 
+  const getCurrentFiscalYear = function () {
+    const today = new Date();
+    return today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+  };
+
+  const fetchAllRecords = async function () {
+    const appId = kintone.app.getId();
+    const fields = ["$id", "name"].concat(SECTIONS.map(function (section) {
+      return section.tableCode;
+    }));
+    const records = [];
+    let offset = 0;
+    while (true) {
+      const response = await kintone.api(kintone.api.url("/k/v1/records", true), "GET", {
+        app: appId,
+        fields: fields,
+        query: "order by name asc limit 500 offset " + offset,
+      });
+      records.push.apply(records, response.records || []);
+      if (!response.records || response.records.length < 500) {
+        break;
+      }
+      offset += 500;
+    }
+    return records;
+  };
+
+  const flattenRecordAchievements = function (record) {
+    const viewState = buildState(record);
+    const items = [];
+    SECTIONS.forEach(function (section) {
+      (viewState.sections[section.key] || []).forEach(function (row) {
+        if (!hasSubstantiveValue(section, row)) {
+          return;
+        }
+        const year = Number(getValue(row, getYearCode(section))) || 0;
+        items.push({
+          section: section,
+          row: row,
+          year: year,
+          title: getValue(row, getTitleCode(section)),
+          role: section.roleCode ? getValue(row, section.roleCode) : "",
+          person: section.personCode ? getValue(row, section.personCode) : "",
+          issues: getViewerIssues(section, row),
+          isHpPublic: HP_PUBLIC_SECTION_KEYS.indexOf(section.key) !== -1,
+        });
+      });
+    });
+    return {
+      name: viewState.name || "氏名未入力",
+      items: items,
+    };
+  };
+
+  const buildDashboardState = function (records) {
+    const people = records.map(flattenRecordAchievements)
+      .filter(function (person) {
+        return person.name && person.name !== "氏名未入力";
+      })
+      .sort(function (a, b) {
+        return a.name.localeCompare(b.name, "ja");
+      });
+    return {
+      people: people,
+      selectedName: people[0] ? people[0].name : "",
+      years: 5,
+      fiscalYear: getCurrentFiscalYear(),
+      error: "",
+    };
+  };
+
+  const getSelectedDashboardPerson = function () {
+    if (!dashboardState || dashboardState.people.length === 0) {
+      return null;
+    }
+    return dashboardState.people.find(function (person) {
+      return person.name === dashboardState.selectedName;
+    }) || dashboardState.people[0];
+  };
+
+  const summarizeDashboardPerson = function (person) {
+    const fiscalYear = dashboardState.fiscalYear;
+    const startYear = fiscalYear - dashboardState.years + 1;
+    const recentItems = person.items.filter(function (item) {
+      return item.year >= startYear && item.year <= fiscalYear;
+    });
+    const fiscalItems = person.items.filter(function (item) {
+      return item.year === fiscalYear;
+    });
+    const issueItems = person.items.filter(function (item) {
+      return item.issues.length > 0;
+    });
+    const hpIssueItems = issueItems.filter(function (item) {
+      return item.isHpPublic;
+    });
+    return {
+      startYear: startYear,
+      recentItems: recentItems,
+      fiscalItems: fiscalItems,
+      issueItems: issueItems,
+      hpIssueItems: hpIssueItems,
+    };
+  };
+
+  const renderDashboardBar = function (label, count, maxCount, className) {
+    const width = maxCount > 0 ? Math.max(6, Math.round((count / maxCount) * 100)) : 0;
+    return [
+      '<div class="radtec-dash-bar-row">',
+      '<div class="radtec-dash-bar-label">' + escapeHtml(label) + '</div>',
+      '<div class="radtec-dash-bar-track"><div class="radtec-dash-bar ' + (className || "") + '" style="width:' + width + '%"></div></div>',
+      '<div class="radtec-dash-bar-value">' + count + '</div>',
+      '</div>',
+    ].join("");
+  };
+
+  const renderDashboardYearChart = function (person, summary) {
+    const years = [];
+    for (let year = summary.startYear; year <= dashboardState.fiscalYear; year += 1) {
+      years.push(year);
+    }
+    const counts = years.map(function (year) {
+      return person.items.filter(function (item) {
+        return item.year === year;
+      }).length;
+    });
+    const maxCount = Math.max.apply(null, counts.concat([1]));
+    return [
+      '<div class="radtec-dash-chart">',
+      years.map(function (year, index) {
+        return renderDashboardBar(String(year), counts[index], maxCount, "is-year");
+      }).join(""),
+      '</div>',
+    ].join("");
+  };
+
+  const renderDashboardSectionChart = function (person) {
+    const counts = SECTIONS.map(function (section) {
+      return {
+        label: section.label,
+        count: person.items.filter(function (item) {
+          return item.section.key === section.key;
+        }).length,
+      };
+    }).filter(function (item) {
+      return item.count > 0;
+    });
+    const maxCount = Math.max.apply(null, counts.map(function (item) {
+      return item.count;
+    }).concat([1]));
+    return [
+      '<div class="radtec-dash-chart">',
+      counts.length ? counts.map(function (item) {
+        return renderDashboardBar(item.label, item.count, maxCount, "is-section");
+      }).join("") : '<div class="radtec-dash-empty">登録済みの業績はありません。</div>',
+      '</div>',
+    ].join("");
+  };
+
+  const renderDashboardRecentList = function (items) {
+    if (items.length === 0) {
+      return '<div class="radtec-dash-empty">該当する業績はありません。</div>';
+    }
+    return [
+      '<ul class="radtec-dash-list">',
+      items.slice().sort(function (a, b) {
+        return b.year - a.year;
+      }).slice(0, 8).map(function (item) {
+        return '<li><span>' + escapeHtml(item.year || "年未入力") + '</span><strong>' + escapeHtml(item.section.label) + '</strong>' + escapeHtml(item.title || "タイトル未入力") + '</li>';
+      }).join(""),
+      '</ul>',
+    ].join("");
+  };
+
+  const getDashboardEvaluation = function (summary) {
+    if (summary.fiscalItems.length >= 3) {
+      return { label: "今年度の活動量が多い", className: "is-high" };
+    }
+    if (summary.fiscalItems.length >= 1) {
+      return { label: "今年度の活動あり", className: "is-good" };
+    }
+    if (summary.recentItems.length >= 3) {
+      return { label: "直近期間で継続あり", className: "is-mid" };
+    }
+    return { label: "面談で確認", className: "is-low" };
+  };
+
+  const renderDashboard = function () {
+    const root = document.getElementById(DASHBOARD_ROOT_ID);
+    if (!root || !dashboardState) {
+      return;
+    }
+    if (dashboardState.error) {
+      root.innerHTML = '<div class="radtec-dash-error">' + escapeHtml(dashboardState.error) + '</div>';
+      return;
+    }
+    const person = getSelectedDashboardPerson();
+    if (!person) {
+      root.innerHTML = '<div class="radtec-dash-empty">表示できる職員データがありません。</div>';
+      return;
+    }
+    const summary = summarizeDashboardPerson(person);
+    const evaluation = getDashboardEvaluation(summary);
+    root.innerHTML = [
+      '<div class="radtec-dash-head">',
+      '<div><strong>研究業績 面談ダッシュボード</strong><span> v' + UI_VERSION + '</span></div>',
+      '<div class="radtec-dash-controls">',
+      '<label>職員<select data-dashboard-name>',
+      dashboardState.people.map(function (item) {
+        return '<option value="' + escapeAttr(item.name) + '"' + (item.name === person.name ? " selected" : "") + '>' + escapeHtml(item.name) + '</option>';
+      }).join(""),
+      '</select></label>',
+      '<label>直近<select data-dashboard-years>',
+      [3, 5, 7, 10].map(function (yearCount) {
+        return '<option value="' + yearCount + '"' + (yearCount === dashboardState.years ? " selected" : "") + '>' + yearCount + '年</option>';
+      }).join(""),
+      '</select></label>',
+      '</div>',
+      '</div>',
+      '<div class="radtec-dash-kpis">',
+      '<div><span>今年度</span><strong>' + summary.fiscalItems.length + '</strong><small>' + dashboardState.fiscalYear + '年度</small></div>',
+      '<div><span>直近' + dashboardState.years + '年</span><strong>' + summary.recentItems.length + '</strong><small>' + summary.startYear + '-' + dashboardState.fiscalYear + '</small></div>',
+      '<div><span>総数</span><strong>' + person.items.length + '</strong><small>全期間</small></div>',
+      '<div class="' + evaluation.className + '"><span>評価目安</span><strong>' + escapeHtml(evaluation.label) + '</strong><small>面談補助</small></div>',
+      '<div class="' + (summary.hpIssueItems.length ? "is-low" : "is-good") + '"><span>HP要確認</span><strong>' + summary.hpIssueItems.length + '</strong><small>未入力等</small></div>',
+      '</div>',
+      '<div class="radtec-dash-grid">',
+      '<section><h3>年別推移</h3>' + renderDashboardYearChart(person, summary) + '</section>',
+      '<section><h3>カテゴリ別</h3>' + renderDashboardSectionChart(person) + '</section>',
+      '<section><h3>今年度の業績</h3>' + renderDashboardRecentList(summary.fiscalItems) + '</section>',
+      '<section><h3>要確認</h3>' + renderDashboardRecentList(summary.issueItems) + '</section>',
+      '</div>',
+    ].join("");
+  };
+
+  const mountDashboard = async function () {
+    const oldRoot = document.getElementById(DASHBOARD_ROOT_ID);
+    if (oldRoot) {
+      oldRoot.remove();
+    }
+    const root = document.createElement("div");
+    root.id = DASHBOARD_ROOT_ID;
+    root.innerHTML = '<div class="radtec-dash-loading">研究業績を集計しています...</div>';
+    const header = kintone.app.getHeaderSpaceElement
+      ? kintone.app.getHeaderSpaceElement()
+      : null;
+    if (header) {
+      header.appendChild(root);
+    } else {
+      document.body.insertBefore(root, document.body.firstChild);
+    }
+    injectStyle();
+    try {
+      await loadStaffNameMap();
+      dashboardState = buildDashboardState(await fetchAllRecords());
+    } catch (error) {
+      dashboardState = {
+        people: [],
+        selectedName: "",
+        years: 5,
+        fiscalYear: getCurrentFiscalYear(),
+        error: "研究業績の集計データを取得できませんでした。画面を再読み込みしても続く場合は、権限またはAPI制限を確認してください。",
+      };
+    }
+    renderDashboard();
+  };
+
   const mount = async function (event) {
     const oldRoot = document.getElementById(ROOT_ID);
     if (oldRoot) {
@@ -1030,6 +1301,19 @@
 
     document.addEventListener("change", function (event) {
       const target = event.target;
+      const dashboardRoot = document.getElementById(DASHBOARD_ROOT_ID);
+      if (dashboardRoot && dashboardRoot.contains(target) && dashboardState) {
+        if (target.matches("[data-dashboard-name]")) {
+          dashboardState.selectedName = target.value;
+          renderDashboard();
+          return;
+        }
+        if (target.matches("[data-dashboard-years]")) {
+          dashboardState.years = Number(target.value) || 5;
+          renderDashboard();
+          return;
+        }
+      }
       handleFieldChange(target);
     });
 
@@ -1243,8 +1527,42 @@
       ".radtec-view-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}",
       ".radtec-view-empty{padding:14px;border:1px dashed #cbd9e4;border-radius:8px;background:#fff;color:#607284;}",
       ".radtec-view-note{margin-top:12px;}",
+      "#" + DASHBOARD_ROOT_ID + "{margin:12px 0 16px;padding:14px;border:1px solid #c8d6df;border-radius:8px;background:#fbfcfd;color:#24384a;font-size:14px;line-height:1.55;}",
+      "#" + DASHBOARD_ROOT_ID + " select{box-sizing:border-box;border:1px solid #cbd9e4;border-radius:6px;background:#fff;padding:6px 28px 6px 8px;min-width:150px;}",
+      ".radtec-dash-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}",
+      ".radtec-dash-head strong{font-size:16px;}",
+      ".radtec-dash-head span{display:block;color:#607284;font-size:12px;font-weight:500;}",
+      ".radtec-dash-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:end;}",
+      ".radtec-dash-controls label{display:grid;gap:3px;color:#607284;font-size:12px;font-weight:700;}",
+      ".radtec-dash-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px;}",
+      ".radtec-dash-kpis div{border:1px solid #d9e3ea;border-radius:8px;background:#fff;padding:10px;min-height:68px;}",
+      ".radtec-dash-kpis span{display:block;color:#607284;font-size:12px;font-weight:700;}",
+      ".radtec-dash-kpis strong{display:block;margin-top:2px;font-size:20px;line-height:1.25;color:#20364a;overflow-wrap:anywhere;}",
+      ".radtec-dash-kpis small{display:block;margin-top:2px;color:#607284;font-size:11px;}",
+      ".radtec-dash-kpis .is-high{border-color:#94c7ad;background:#eef9f2;}",
+      ".radtec-dash-kpis .is-good{border-color:#b7d6ea;background:#f2f9fd;}",
+      ".radtec-dash-kpis .is-mid{border-color:#d8cf96;background:#fffbe8;}",
+      ".radtec-dash-kpis .is-low{border-color:#e7bd83;background:#fff7e8;}",
+      ".radtec-dash-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}",
+      ".radtec-dash-grid section{border:1px solid #d9e3ea;border-radius:8px;background:#fff;padding:10px;}",
+      ".radtec-dash-grid h3{margin:0 0 8px;font-size:14px;}",
+      ".radtec-dash-chart{display:grid;gap:7px;}",
+      ".radtec-dash-bar-row{display:grid;grid-template-columns:86px minmax(0,1fr) 28px;gap:8px;align-items:center;}",
+      ".radtec-dash-bar-label{font-size:12px;font-weight:700;color:#516475;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".radtec-dash-bar-track{height:13px;border-radius:999px;background:#eef3f6;overflow:hidden;}",
+      ".radtec-dash-bar{height:100%;border-radius:999px;background:#256fa8;}",
+      ".radtec-dash-bar.is-section{background:#3c8f66;}",
+      ".radtec-dash-bar-value{text-align:right;font-weight:800;color:#20364a;font-size:12px;}",
+      ".radtec-dash-list{margin:0;padding:0;list-style:none;display:grid;gap:6px;}",
+      ".radtec-dash-list li{display:grid;grid-template-columns:50px 74px minmax(0,1fr);gap:6px;align-items:start;border-top:1px solid #eef3f6;padding-top:6px;color:#20364a;overflow-wrap:anywhere;}",
+      ".radtec-dash-list li:first-child{border-top:0;padding-top:0;}",
+      ".radtec-dash-list span{font-weight:800;color:#256fa8;}",
+      ".radtec-dash-list strong{font-size:12px;color:#516475;}",
+      ".radtec-dash-empty,.radtec-dash-loading,.radtec-dash-error{padding:12px;border:1px dashed #cbd9e4;border-radius:8px;background:#fff;color:#607284;}",
+      ".radtec-dash-error{border-color:#e0a3a3;background:#fff0f0;color:#7a2d2d;font-weight:700;}",
       "@media(max-width:760px){.radtec-ui-grid{grid-template-columns:1fr;}.radtec-ui-head,.radtec-ui-row-head{align-items:flex-start;flex-direction:column;}.radtec-ui-inline-field{grid-template-columns:1fr;}.radtec-ui-floating-toolbar{left:8px;right:8px;bottom:8px;flex-wrap:wrap;justify-content:stretch;}.radtec-ui-floating-toolbar button{flex:1 1 auto;}}",
       "@media(max-width:760px){.radtec-view-head{align-items:flex-start;flex-direction:column;}.radtec-view-card-main{grid-template-columns:1fr;}.radtec-view-meta{grid-template-columns:1fr;}.radtec-view-meta div{grid-template-columns:1fr;gap:1px;}}",
+      "@media(max-width:960px){.radtec-dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.radtec-dash-grid{grid-template-columns:1fr;}.radtec-dash-head{align-items:flex-start;flex-direction:column;}.radtec-dash-list li{grid-template-columns:44px 68px minmax(0,1fr);}}",
     ].join("");
     document.head.appendChild(style);
   };
@@ -1261,6 +1579,11 @@
   const escapeAttr = escapeHtml;
 
   wireEvents();
+
+  kintone.events.on(EVENTS_INDEX, async function (event) {
+    await mountDashboard();
+    return event;
+  });
 
   kintone.events.on(EVENTS_SHOW, async function (event) {
     await mount(event);
